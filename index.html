@@ -2,11 +2,21 @@
 <html lang="uk" class="dark">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>LinguaSwipe - Tinder-Style English Vocabulary Trainer</title>
 
+    <!-- PWA: installable app on phone -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0f172a">
+    <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="LinguaSwipe">
+
     <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.tailwindcss.com/3.4.17"></script>
     <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Vue 3 CDN -->
@@ -37,6 +47,17 @@
             touch-action: manipulation;
             user-select: none;
             -webkit-user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            overscroll-behavior-y: none;
+            /* Keep content clear of the iPhone home indicator and notch sides */
+            padding-bottom: env(safe-area-inset-bottom);
+            padding-left: env(safe-area-inset-left);
+            padding-right: env(safe-area-inset-right);
+        }
+
+        /* iOS zooms into inputs with font-size < 16px; prevent that on phones */
+        @media (max-width: 640px) {
+            input, textarea { font-size: 16px !important; }
         }
 
         /* 3D Perspective & Flip effects */
@@ -94,6 +115,15 @@
 
     <!-- Hidden file input for importing words into the user's collection -->
     <input ref="fileInputRef" type="file" accept=".csv,.txt,.tsv,text/csv,text/plain" class="hidden" @change="onFileSelected">
+
+    <!-- INSTALL APP BANNER (Android: real button, iPhone: instructions) -->
+    <div v-if="showInstallBanner" class="bg-indigo-950/90 border-b border-indigo-800 px-4 py-2.5 text-xs text-indigo-200 flex items-center justify-center gap-3">
+        <img src="icons/icon-192.png" alt="" class="w-7 h-7 rounded-lg">
+        <span v-if="installPrompt">Встановіть LinguaSwipe як додаток на телефон</span>
+        <span v-else>Щоб встановити: натисніть <i class="fa-solid fa-arrow-up-from-bracket mx-0.5"></i> «Поділитися» → «На початковий екран»</span>
+        <button v-if="installPrompt" @click="installApp()" class="bg-indigo-500 hover:bg-indigo-400 text-white font-bold px-3 py-1.5 rounded-lg whitespace-nowrap">Встановити</button>
+        <button @click="dismissInstall()" title="Закрити" class="text-indigo-300 hover:text-white px-1"><i class="fa-solid fa-xmark"></i></button>
+    </div>
 
     <!-- LOADING (checking session) -->
     <div v-if="!authReady" class="flex-1 flex items-center justify-center text-slate-500">
@@ -642,6 +672,27 @@
 
     const { createApp, ref, computed, onMounted, onUnmounted } = Vue;
 
+    // ===== PWA =====
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+    }
+
+    // Android/Chrome fires this when the app can be installed; keep it for our own button
+    const installPrompt = ref(null);
+    window.addEventListener('beforeinstallprompt', e => {
+        e.preventDefault();
+        installPrompt.value = e;
+    });
+    window.addEventListener('appinstalled', () => { installPrompt.value = null; });
+
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+    const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent) ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+    function readInstallDismissed() {
+        try { return localStorage.getItem('linguaswipe_install_dismissed') === '1'; } catch (e) { return false; }
+    }
+
     createApp({
         setup() {
             const currentTab = ref('practice');
@@ -679,6 +730,23 @@
             const authError = ref('');
             const authLoading = ref(false);
             const fileInputRef = ref(null);
+
+            // Install banner
+            const installDismissed = ref(readInstallDismissed());
+            const showInstallBanner = computed(() =>
+                !isStandalone && !installDismissed.value && (installPrompt.value !== null || isIos));
+
+            async function installApp() {
+                if (!installPrompt.value) return;
+                installPrompt.value.prompt();
+                await installPrompt.value.userChoice;
+                installPrompt.value = null;
+            }
+
+            function dismissInstall() {
+                installDismissed.value = true;
+                try { localStorage.setItem('linguaswipe_install_dismissed', '1'); } catch (e) { /* ignore */ }
+            }
 
             const leitnerBoxesInfo = [
                 { title: 'Нові / На вивченні', interval: 'Сьогодні' },
@@ -1143,6 +1211,10 @@
                 authError,
                 authLoading,
                 fileInputRef,
+                installPrompt,
+                showInstallBanner,
+                installApp,
+                dismissInstall,
                 submitAuth,
                 logout,
                 openFilePicker,

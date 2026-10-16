@@ -36,6 +36,7 @@ jobs:
           fi
           mkdir _site
           sed -e "s#__SUPABASE_URL__#${SUPABASE_URL%/}#" -e "s#__SUPABASE_KEY__#${SUPABASE_KEY}#" index.html > _site/index.html
+          cp -R manifest.json sw.js icons _site/
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
