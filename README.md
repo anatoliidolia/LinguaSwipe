@@ -88,3 +88,5 @@ php -S localhost:8000
 ```
 
 і відкрийте http://localhost:8000.
+
+URL: https://anatoliidolia.github.io/LinguaSwipe/
