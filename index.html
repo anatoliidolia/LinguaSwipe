@@ -1,0 +1,1168 @@
+<!DOCTYPE html>
+<html lang="uk" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LinguaSwipe - Tinder-Style English Vocabulary Trainer</title>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Vue 3 CDN -->
+    <script src="https://unpkg.com/vue@3.5.13/dist/vue.global.prod.js"></script>
+    <!-- Supabase (login + database) -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            touch-action: manipulation;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* 3D Perspective & Flip effects */
+        .perspective-1000 {
+            perspective: 1000px;
+            -webkit-perspective: 1000px;
+        }
+        .transform-style-3d {
+            transform-style: preserve-3d;
+            -webkit-transform-style: preserve-3d;
+            transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .backface-hidden {
+            backface-visibility: hidden !important;
+            -webkit-backface-visibility: hidden !important;
+            transform-style: preserve-3d;
+            -webkit-transform-style: preserve-3d;
+        }
+        .rotate-y-180 {
+            transform: rotateY(180deg);
+            -webkit-transform: rotateY(180deg);
+        }
+        .card-front-face {
+            transform: rotateY(0deg);
+            -webkit-transform: rotateY(0deg);
+        }
+        .card-back-face {
+            transform: rotateY(180deg);
+            -webkit-transform: rotateY(180deg);
+        }
+
+        /* Glassmorphism styling */
+        .glass-card {
+            background: rgba(30, 41, 59, 0.85);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.6);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(51, 65, 85, 0.8);
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col selection:bg-sky-500 selection:text-white antialiased overflow-x-hidden">
+
+<div id="app" class="flex-1 flex flex-col min-h-screen">
+
+    <!-- Hidden file input for importing words into the user's collection -->
+    <input ref="fileInputRef" type="file" accept=".csv,.txt,.tsv,text/csv,text/plain" class="hidden" @change="onFileSelected">
+
+    <!-- LOADING (checking session) -->
+    <div v-if="!authReady" class="flex-1 flex items-center justify-center text-slate-500">
+        <i class="fa-solid fa-spinner fa-spin text-2xl"></i>
+    </div>
+
+    <!-- LOGIN / REGISTER SCREEN -->
+    <div v-else-if="!user" class="flex-1 flex items-center justify-center p-4">
+        <div class="glass-card w-full max-w-sm p-7 rounded-3xl border border-slate-700 shadow-2xl">
+            <div class="text-center mb-6">
+                <div class="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-sky-500 to-indigo-600 flex items-center justify-center text-3xl text-white shadow-lg shadow-sky-500/30 mb-3">
+                    <i class="fa-solid fa-layer-group"></i>
+                </div>
+                <h1 class="text-2xl font-black text-white">LinguaSwipe</h1>
+                <p class="text-xs text-slate-400 mt-1">{{ authMode === 'login' ? 'Увійдіть, щоб відкрити свою колекцію слів' : 'Створіть акаунт для власної колекції слів' }}</p>
+            </div>
+
+            <div class="flex bg-slate-800/60 p-1 rounded-2xl border border-slate-700/50 mb-5">
+                <button type="button" @click="authMode = 'login'; authError = ''"
+                        :class="authMode === 'login' ? 'bg-sky-500 text-white shadow-md' : 'text-slate-400 hover:text-white'"
+                        class="flex-1 py-2 rounded-xl text-xs font-semibold transition-all">Вхід</button>
+                <button type="button" @click="authMode = 'register'; authError = ''"
+                        :class="authMode === 'register' ? 'bg-sky-500 text-white shadow-md' : 'text-slate-400 hover:text-white'"
+                        class="flex-1 py-2 rounded-xl text-xs font-semibold transition-all">Реєстрація</button>
+            </div>
+
+            <form @submit.prevent="submitAuth" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">Email</label>
+                    <input v-model="authForm.email" required autocomplete="email" type="email" placeholder="you@gmail.com"
+                           class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-sky-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">Пароль</label>
+                    <input v-model="authForm.password" required type="password" placeholder="••••••"
+                           :autocomplete="authMode === 'login' ? 'current-password' : 'new-password'"
+                           class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-sky-500">
+                </div>
+
+                <p v-if="authError" class="text-xs text-rose-400 flex items-center gap-1.5">
+                    <i class="fa-solid fa-circle-exclamation"></i>{{ authError }}
+                </p>
+
+                <button type="submit" :disabled="authLoading"
+                        class="w-full py-3 rounded-2xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 disabled:opacity-60 text-white font-bold text-sm shadow-xl shadow-sky-500/25 transition-all flex items-center justify-center gap-2">
+                    <i class="fa-solid" :class="authLoading ? 'fa-spinner fa-spin' : (authMode === 'login' ? 'fa-right-to-bracket' : 'fa-user-plus')"></i>
+                    <span>{{ authMode === 'login' ? 'Увійти' : 'Створити акаунт' }}</span>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <template v-else>
+    <!-- HEADER BAR -->
+    <header class="border-b border-slate-800/80 bg-slate-900/90 backdrop-blur-md sticky top-0 z-40 px-4 py-3">
+        <div class="max-w-4xl mx-auto flex items-center justify-between gap-2">
+
+            <!-- Navigation Tabs -->
+            <nav class="flex items-center gap-1 sm:gap-2 bg-slate-800/60 p-1 rounded-2xl border border-slate-700/50">
+                <button
+                        @click="currentTab = 'practice'"
+                        :class="currentTab === 'practice' ? 'bg-sky-500 text-white shadow-md' : 'text-slate-400 hover:text-white'"
+                        class="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5">
+                    <i class="fa-solid fa-cards-blank"></i>
+                    <span class="hidden md:inline">Тренування</span>
+                </button>
+
+                <button
+                        @click="currentTab = 'dictionary'"
+                        :class="currentTab === 'dictionary' ? 'bg-sky-500 text-white shadow-md' : 'text-slate-400 hover:text-white'"
+                        class="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5">
+                    <i class="fa-solid fa-book"></i>
+                    <span class="hidden md:inline">Словник</span>
+                    <span class="bg-slate-900/50 text-slate-300 px-1.5 py-0.2 text-[10px] rounded-full font-mono">{{ words.length }}</span>
+                </button>
+
+                <button
+                        @click="currentTab = 'stats'"
+                        :class="currentTab === 'stats' ? 'bg-sky-500 text-white shadow-md' : 'text-slate-400 hover:text-white'"
+                        class="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5">
+                    <i class="fa-solid fa-chart-line"></i>
+                    <span class="hidden md:inline">SRS Прогрес</span>
+                </button>
+            </nav>
+
+            <!-- Quick Actions / Import / User -->
+            <div class="flex items-center gap-2">
+                <button
+                        @click="openFilePicker()"
+                        title="Завантажити слова з файлу (CSV / TXT) у свою колекцію"
+                        class="bg-slate-800 hover:bg-slate-700 text-sky-400 border border-slate-700 px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5">
+                    <i class="fa-solid fa-file-csv"></i>
+                    <span class="hidden sm:inline">Імпорт файлу</span>
+                </button>
+
+                <button
+                        @click="openAddModal()"
+                        class="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white px-3 py-1.5 rounded-xl text-xs font-bold shadow-lg shadow-emerald-500/20 transition-all flex items-center gap-1.5">
+                    <i class="fa-solid fa-plus"></i>
+                    <span class="hidden sm:inline">Додати слово</span>
+                </button>
+
+                <div class="flex items-center gap-1 bg-slate-800/60 border border-slate-700/50 rounded-xl pl-2.5 pr-1 py-1">
+                    <i class="fa-solid fa-user text-slate-400 text-[10px]"></i>
+                    <span class="text-xs font-semibold text-slate-200 max-w-[90px] truncate">{{ user.username }}</span>
+                    <button @click="logout()" title="Вийти"
+                            class="text-slate-400 hover:text-rose-400 text-xs px-1.5 py-0.5 rounded-lg hover:bg-slate-700 transition-all">
+                        <i class="fa-solid fa-right-from-bracket"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- STATUS BANNER FOR CSV LOADING -->
+    <div v-if="statusMessage" class="bg-sky-950/80 border-b border-sky-800 px-4 py-2 text-center text-xs text-sky-300 flex items-center justify-center gap-2">
+        <i class="fa-solid fa-info-circle"></i>
+        <span>{{ statusMessage }}</span>
+        <button @click="statusMessage = ''" class="ml-2 text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+
+    <main class="flex-1 max-w-4xl w-full mx-auto p-4 flex flex-col justify-center items-center">
+
+        <!-- VIEW 1: PRACTICE DECK (TINDER SWIPE + 3D FLIP CARD) -->
+        <div v-if="currentTab === 'practice'" class="w-full flex-1 flex flex-col items-center justify-between max-w-md my-auto py-2">
+
+            <!-- Top Session Indicator & Progress -->
+            <div class="w-full mb-3 flex items-center justify-between text-xs text-slate-400 px-1">
+                <div class="flex items-center gap-2 font-medium">
+                    <span class="w-2.5 h-2.5 rounded-full bg-sky-400 animate-pulse"></span>
+                    <span>Залишилось у сесії: <strong class="text-white font-bold">{{ activeQueue.length }}</strong></span>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span class="text-emerald-400 font-semibold"><i class="fa-solid fa-circle-check mr-1"></i>{{ sessionKnowCount }}</span>
+                    <span class="text-rose-400 font-semibold"><i class="fa-solid fa-arrows-rotate mr-1"></i>{{ sessionRepeatCount }}</span>
+                </div>
+            </div>
+
+            <!-- Progress bar -->
+            <div class="w-full bg-slate-800/80 rounded-full h-2 mb-4 overflow-hidden border border-slate-700/50">
+                <div
+                        class="bg-gradient-to-r from-sky-500 to-emerald-400 h-full transition-all duration-300"
+                        :style="{ width: sessionProgressPercentage + '%' }">
+                </div>
+            </div>
+
+            <!-- CARD STACK CONTAINER -->
+            <div v-if="activeQueue.length > 0" class="relative w-full aspect-[4/5] max-h-[460px] perspective-1000 my-auto">
+
+                <!-- Background Card Preview (Stack effect) -->
+                <div
+                        v-if="nextCard"
+                        class="absolute inset-0 rounded-3xl bg-slate-900/90 border border-slate-700/40 p-8 shadow-2xl flex flex-col items-center justify-center opacity-40 scale-95 translate-y-4 pointer-events-none transition-all duration-300">
+                    <span class="text-xs text-slate-500 font-mono mb-2">НАСТУПНЕ СЛОВО</span>
+                    <h3 class="text-3xl font-black text-slate-300">{{ nextCard.word }}</h3>
+                </div>
+
+                <!-- TOP ACTIVE CARD WITH DRAG & 3D FLIP -->
+                <div
+                        ref="topCardRef"
+                        class="absolute inset-0 rounded-3xl cursor-grab active:cursor-grabbing touch-none select-none transition-transform duration-100"
+                        :style="cardTransformStyle"
+                        @pointerdown="onPointerDown"
+                        @pointermove="onPointerMove"
+                        @pointerup="onPointerUp"
+                        @pointerleave="onPointerUp">
+
+                    <!-- SWIPE OVERLAY INDICATORS -->
+                    <div
+                            class="absolute top-6 left-6 z-30 border-4 border-emerald-400 text-emerald-400 font-black text-2xl tracking-wider uppercase px-4 py-1 rounded-2xl rotate-[-15deg] pointer-events-none transition-opacity"
+                            :style="{ opacity: knowOverlayOpacity }">
+                        ЗНАЮ
+                    </div>
+                    <div
+                            class="absolute top-6 right-6 z-30 border-4 border-rose-500 text-rose-500 font-black text-2xl tracking-wider uppercase px-4 py-1 rounded-2xl rotate-[15deg] pointer-events-none transition-opacity"
+                            :style="{ opacity: dontKnowOverlayOpacity }">
+                        НЕ ЗНАЮ
+                    </div>
+
+                    <!-- FLIP CONTAINER -->
+                    <div
+                            class="w-full h-full transform-style-3d relative rounded-3xl"
+                            :class="{ 'rotate-y-180': isFlipped }">
+
+                        <!-- FRONT SIDE: ENGLISH WORD -->
+                        <div class="card-front-face absolute inset-0 w-full h-full rounded-3xl p-8 flex flex-col justify-between items-center backface-hidden bg-slate-900 border border-slate-700/80 shadow-2xl">
+
+                            <!-- Front Header -->
+                            <div class="w-full flex justify-between items-center">
+                  <span class="text-[11px] uppercase tracking-widest font-bold text-sky-400 bg-sky-500/10 px-3 py-1 rounded-full border border-sky-500/20">
+                    ENGLISH
+                  </span>
+                                <span class="text-xs text-slate-400 font-mono bg-slate-800 px-2.5 py-1 rounded-lg">
+                    SRS Box {{ currentCard.box }}
+                  </span>
+                            </div>
+
+                            <!-- Main English Word Display -->
+                            <div class="text-center my-auto px-2">
+                                <h2 class="text-4xl sm:text-5xl font-black text-white tracking-tight leading-tight">
+                                    {{ currentCard.word }}
+                                </h2>
+                            </div>
+
+                            <!-- Card Front Hint -->
+                            <div class="text-center text-xs text-slate-400 flex items-center justify-center gap-2 font-medium bg-slate-800/80 px-4 py-2 rounded-xl border border-slate-700/50">
+                                <i class="fa-solid fa-hand-pointer text-sky-400 animate-bounce"></i>
+                                <span>Натисніть на картку, щоб показати переклад</span>
+                            </div>
+                        </div>
+
+                        <!-- BACK SIDE: UKRAINIAN TRANSLATION -->
+                        <div class="card-back-face absolute inset-0 w-full h-full rounded-3xl p-8 flex flex-col justify-between items-center backface-hidden bg-slate-900 border-2 border-emerald-500/50 shadow-2xl">
+
+                            <!-- Back Header -->
+                            <div class="w-full flex justify-between items-center border-b border-slate-800 pb-3">
+                  <span class="text-[11px] uppercase tracking-widest font-bold text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
+                    ПЕРЕКЛАД (УКР)
+                  </span>
+                                <span class="text-xs text-slate-400 font-mono bg-slate-800 px-2.5 py-1 rounded-lg">
+                    SRS Box {{ currentCard.box }}
+                  </span>
+                            </div>
+
+                            <!-- Main Ukrainian Translation Display -->
+                            <div class="text-center my-auto px-2">
+                                <span class="text-xs text-slate-500 uppercase font-semibold tracking-widest block mb-3">Українською:</span>
+                                <h3 class="text-3xl sm:text-4xl font-black text-emerald-400 leading-snug">
+                                    {{ currentCard.translation }}
+                                </h3>
+                            </div>
+
+                            <!-- Card Back Hint -->
+                            <div class="text-center text-xs text-slate-400 bg-slate-800/80 px-4 py-2 rounded-xl border border-slate-700/50">
+                                <span>Свайпніть <strong class="text-rose-400">Вліво (Не знаю)</strong> або <strong class="text-emerald-400">Вправо (Знаю)</strong></span>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- EMPTY COLLECTION STATE -->
+            <div v-else-if="words.length === 0" class="w-full glass-card rounded-3xl p-8 text-center shadow-2xl border border-slate-700/60 my-auto flex flex-col items-center">
+                <div class="w-20 h-20 rounded-full bg-sky-500/20 text-sky-400 flex items-center justify-center text-4xl mb-4 border border-sky-500/40">
+                    <i class="fa-solid fa-box-open"></i>
+                </div>
+                <h2 class="text-2xl font-extrabold text-white mb-2">Ваша колекція порожня</h2>
+                <p class="text-slate-400 text-sm max-w-xs mb-6">Додайте слова вручну, вставте список текстом або завантажте CSV-файл.</p>
+                <div class="flex flex-col gap-2 w-full">
+                    <button @click="openFilePicker()" class="w-full py-3 rounded-2xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-bold text-sm transition-all flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-file-arrow-up"></i><span>Завантажити файл</span>
+                    </button>
+                    <button @click="openBulkModal()" class="w-full py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-semibold text-sm transition-all flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-file-import"></i><span>Вставити текст</span>
+                    </button>
+                    <button @click="openAddModal()" class="w-full py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-semibold text-sm transition-all flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-plus"></i><span>Додати одне слово</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- SESSION COMPLETED STATE -->
+            <div v-else class="w-full glass-card rounded-3xl p-8 text-center shadow-2xl border border-slate-700/60 my-auto flex flex-col items-center">
+                <div class="w-20 h-20 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-4xl mb-4 border border-emerald-500/40 shadow-lg shadow-emerald-500/20 animate-bounce">
+                    <i class="fa-solid fa-trophy"></i>
+                </div>
+                <h2 class="text-3xl font-extrabold text-white mb-2">Сесію завершено!</h2>
+                <p class="text-slate-400 text-sm max-w-xs mb-6">Усі слова з цієї сесії пройдені та зафіксовані в інтервальній системі повторень SRS!</p>
+
+                <div class="grid grid-cols-2 gap-3 w-full mb-6">
+                    <div class="bg-slate-800/60 p-3 rounded-2xl border border-slate-700/50">
+                        <span class="text-xs text-slate-400 block mb-1">Вивчено в сесії</span>
+                        <span class="text-2xl font-black text-emerald-400">{{ sessionKnowCount }}</span>
+                    </div>
+                    <div class="bg-slate-800/60 p-3 rounded-2xl border border-slate-700/50">
+                        <span class="text-xs text-slate-400 block mb-1">Повторів зроблено</span>
+                        <span class="text-2xl font-black text-amber-400">{{ sessionRepeatCount }}</span>
+                    </div>
+                </div>
+
+                <button
+                        @click="startSession()"
+                        class="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-bold text-sm shadow-xl shadow-sky-500/25 transition-all flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-rotate-right"></i>
+                    <span>Почати нову сесію</span>
+                </button>
+            </div>
+
+            <!-- ACTION BUTTONS BAR -->
+            <div v-if="activeQueue.length > 0" class="w-full mt-4 flex items-center justify-center gap-6">
+                <!-- Don't Know Button -->
+                <button
+                        @click="triggerSwipe('left')"
+                        class="w-16 h-16 rounded-full bg-slate-900 border-2 border-rose-500/60 text-rose-400 hover:bg-rose-500 hover:text-white transition-all shadow-lg shadow-rose-500/10 flex flex-col items-center justify-center active:scale-90"
+                        title="Не знаю [← / A]">
+                    <i class="fa-solid fa-xmark text-2xl"></i>
+                    <span class="text-[9px] font-bold mt-0.5 uppercase">Не знаю</span>
+                </button>
+
+                <!-- Flip Card -->
+                <button
+                        @click="toggleFlip()"
+                        class="w-14 h-14 rounded-full bg-slate-800 border border-slate-700 text-amber-400 hover:bg-amber-500 hover:text-white transition-all shadow-md flex flex-col items-center justify-center active:scale-90"
+                        title="Перевернути [Пробіл]">
+                    <i class="fa-solid fa-rotate text-lg"></i>
+                    <span class="text-[8px] font-bold mt-0.5 uppercase">Переворот</span>
+                </button>
+
+                <!-- Know Button -->
+                <button
+                        @click="triggerSwipe('right')"
+                        class="w-16 h-16 rounded-full bg-slate-900 border-2 border-emerald-500/60 text-emerald-400 hover:bg-emerald-500 hover:text-white transition-all shadow-lg shadow-emerald-500/10 flex flex-col items-center justify-center active:scale-90"
+                        title="Знаю [→ / D]">
+                    <i class="fa-solid fa-check text-2xl"></i>
+                    <span class="text-[9px] font-bold mt-0.5 uppercase">Знаю</span>
+                </button>
+            </div>
+
+            <!-- Hotkeys Footer Hint -->
+            <div class="hidden sm:flex items-center justify-center gap-4 mt-3 text-[11px] text-slate-500 font-medium">
+                <span><kbd class="px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-slate-300">←</kbd> / <kbd class="px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-slate-300">A</kbd> Не знаю</span>
+                <span><kbd class="px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-slate-300">Space</kbd> Переворот</span>
+                <span><kbd class="px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-slate-300">→</kbd> / <kbd class="px-1.5 py-0.5 bg-slate-800 border border-slate-700 rounded text-slate-300">D</kbd> Знаю</span>
+            </div>
+        </div>
+
+        <!-- VIEW 2: DICTIONARY & VOCABULARY MANAGEMENT -->
+        <div v-else-if="currentTab === 'dictionary'" class="w-full flex-1 flex flex-col my-2">
+
+            <!-- Controls & Search Bar -->
+            <div class="glass-card p-4 rounded-2xl mb-4 border border-slate-800 flex flex-col sm:flex-row gap-3 justify-between items-center">
+
+                <div class="relative w-full sm:w-80">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
+                    <input
+                            v-model="searchQuery"
+                            type="text"
+                            placeholder="Пошук слова або перекладу..."
+                            class="w-full bg-slate-900/90 border border-slate-700/80 text-slate-200 text-xs rounded-xl pl-9 pr-3 py-2.5 focus:outline-none focus:border-sky-500 transition-all">
+                </div>
+
+                <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+                    <button
+                            @click="openFilePicker()"
+                            class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-sky-400 rounded-xl text-xs font-semibold border border-slate-700 transition-all flex items-center gap-1.5">
+                        <i class="fa-solid fa-file-arrow-up"></i>
+                        <span>Завантажити файл</span>
+                    </button>
+
+                    <button
+                            @click="openAddModal()"
+                            class="px-3 py-2 bg-sky-500 hover:bg-sky-400 text-white rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5">
+                        <i class="fa-solid fa-plus"></i>
+                        <span>Одне слово</span>
+                    </button>
+
+                    <button
+                            @click="openBulkModal()"
+                            class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold border border-slate-700 transition-all flex items-center gap-1.5">
+                        <i class="fa-solid fa-file-import"></i>
+                        <span>Вставити текст</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Dictionary List -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 flex-1 overflow-y-auto max-h-[calc(100vh-220px)] pr-1">
+                <div
+                        v-for="item in filteredWords"
+                        :key="item.id"
+                        class="glass-card p-4 rounded-2xl border border-slate-800 hover:border-slate-700 transition-all flex items-center justify-between">
+
+                    <div class="flex-1 pr-3">
+                        <h3 class="font-extrabold text-base text-white mb-0.5">{{ item.word }}</h3>
+                        <p class="text-emerald-400 font-semibold text-sm">{{ item.translation }}</p>
+                    </div>
+
+                    <div class="flex items-center gap-2.5">
+              <span class="text-[10px] font-mono font-bold px-2 py-1 rounded-md bg-slate-800 text-slate-400 border border-slate-700">
+                Box {{ item.box }}
+              </span>
+                        <button @click="editWord(item)" class="text-slate-400 hover:text-sky-400 text-xs p-1.5 rounded-lg hover:bg-slate-800 transition-all">
+                            <i class="fa-solid fa-pen-to-square"></i>
+                        </button>
+                        <button @click="deleteWord(item.id)" class="text-slate-400 hover:text-rose-400 text-xs p-1.5 rounded-lg hover:bg-slate-800 transition-all">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div v-if="filteredWords.length === 0" class="col-span-full text-center py-12 text-slate-500">
+                    <i class="fa-solid fa-book-open text-3xl mb-2 block"></i>
+                    <p>Слів не знайдено за вашим запитом.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW 3: SRS LEITNER MATRIX STATS -->
+        <div v-else-if="currentTab === 'stats'" class="w-full flex-1 flex flex-col my-2 max-w-3xl mx-auto">
+
+            <div class="glass-card p-6 rounded-3xl border border-slate-800 mb-6">
+                <h2 class="text-xl font-bold text-white mb-2 flex items-center gap-2">
+                    <i class="fa-solid fa-brain text-sky-400"></i>
+                    Матриця повторень Leitner (SRS)
+                </h2>
+                <p class="text-xs text-slate-400 leading-relaxed">
+                    Кожне успішне «Знаю» переміщує слово у вищий Box і збільшує інтервал повторення. Якщо слово свайпнути «Не знаю» — воно повертається в Box 0 і повторюється в цій же сесії.
+                </p>
+            </div>
+
+            <!-- 6 Boxes Grid -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div
+                        v-for="(boxInfo, index) in leitnerBoxesInfo"
+                        :key="index"
+                        class="glass-card p-4 rounded-2xl border border-slate-800 flex flex-col justify-between relative overflow-hidden">
+
+                    <div class="flex items-center justify-between mb-3">
+                        <div>
+                            <span class="text-xs font-bold uppercase tracking-wider text-slate-400 block">Рівень {{ index }}</span>
+                            <h3 class="text-sm font-extrabold text-white">{{ boxInfo.title }}</h3>
+                        </div>
+                        <span class="w-8 h-8 rounded-xl bg-sky-500/10 text-sky-400 flex items-center justify-center font-bold text-sm border border-sky-500/20">
+                {{ getBoxCount(index) }}
+              </span>
+                    </div>
+
+                    <div class="text-[11px] text-slate-400 mb-3">
+                        <p><i class="fa-solid fa-clock text-amber-400 mr-1.5"></i>Повтор: <strong class="text-slate-200">{{ boxInfo.interval }}</strong></p>
+                    </div>
+
+                    <div class="w-full bg-slate-900 rounded-full h-1.5 overflow-hidden">
+                        <div
+                                class="bg-sky-500 h-full transition-all"
+                                :style="{ width: words.length ? (getBoxCount(index) / words.length * 100) + '%' : '0%' }">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- ADD / EDIT SINGLE WORD MODAL -->
+    <div v-if="singleModalOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+        <div class="glass-card w-full max-w-md p-6 rounded-3xl border border-slate-700 shadow-2xl relative">
+
+            <button
+                    @click="singleModalOpen = false"
+                    class="absolute top-4 right-4 text-slate-400 hover:text-white w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+
+            <h3 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                <i class="fa-solid fa-plus-circle text-sky-400"></i>
+                {{ formWord.id ? 'Редагувати слово' : 'Додати нове слово' }}
+            </h3>
+
+            <form @submit.prevent="saveFormWord" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">Слово англійською *</label>
+                    <input
+                            v-model="formWord.word"
+                            required
+                            type="text"
+                            placeholder="e.g. reluctant"
+                            class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-sky-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">Переклад українською *</label>
+                    <input
+                            v-model="formWord.translation"
+                            required
+                            type="text"
+                            placeholder="e.g. неохочий, вимушений"
+                            class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-sky-500">
+                </div>
+
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" @click="singleModalOpen = false" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white bg-slate-800">
+                        Скасувати
+                    </button>
+                    <button type="submit" class="px-5 py-2 rounded-xl text-xs font-bold text-white bg-sky-500 hover:bg-sky-400 shadow-md">
+                        Зберегти
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- BULK TEXT IMPORT MODAL -->
+    <div v-if="bulkModalOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+        <div class="glass-card w-full max-w-lg p-6 rounded-3xl border border-slate-700 shadow-2xl relative">
+
+            <button
+                    @click="bulkModalOpen = false"
+                    class="absolute top-4 right-4 text-slate-400 hover:text-white w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+
+            <h3 class="text-lg font-bold text-white mb-2 flex items-center gap-2">
+                <i class="fa-solid fa-file-import text-sky-400"></i>
+                Масове завантаження слів з тексту
+            </h3>
+
+            <p class="text-xs text-slate-400 mb-4">
+                Вставте список слів у форматі: <code class="text-sky-300 font-mono">Слово, Переклад</code> або <code class="text-sky-300 font-mono">Слово - Переклад</code>.
+                Слова, які вже є у вашій колекції, буде пропущено.
+            </p>
+
+            <textarea
+                    v-model="bulkText"
+                    rows="8"
+                    placeholder="reluctant, неохочий&#10;persistent, наполегливий&#10;comprehensive, всебічний"
+                    class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-white font-mono focus:outline-none focus:border-sky-500 mb-4">
+        </textarea>
+
+            <div class="flex justify-end gap-2">
+                <button @click="bulkModalOpen = false" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white bg-slate-800">
+                    Скасувати
+                </button>
+                <button @click="processBulkImport" class="px-5 py-2 rounded-xl text-xs font-bold text-white bg-emerald-500 hover:bg-emerald-400 shadow-md">
+                    Додати слова
+                </button>
+            </div>
+        </div>
+    </div>
+    </template>
+
+</div>
+
+<script>
+    // ===== НАЛАШТУВАННЯ SUPABASE =====
+    // Значення підставляє GitHub Actions зі змінних репозиторію SUPABASE_URL і SUPABASE_KEY
+    // (Settings → Secrets and variables → Actions → Variables). Див. .github/workflows/pages.yml.
+    // Ключ anon публічний за задумом: доступ до чужих слів закривають правила (RLS) у базі.
+    const SUPABASE_URL = '__SUPABASE_URL__';
+    const SUPABASE_KEY = '__SUPABASE_KEY__';
+
+    const sb = SUPABASE_URL.startsWith('https://')
+        ? supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
+        : null;
+
+    const { createApp, ref, computed, onMounted, onUnmounted } = Vue;
+
+    createApp({
+        setup() {
+            const currentTab = ref('practice');
+            const words = ref([]);
+            const activeQueue = ref([]);
+            const initialSessionCount = ref(0);
+            const statusMessage = ref('');
+
+            const isFlipped = ref(false);
+            const sessionKnowCount = ref(0);
+            const sessionRepeatCount = ref(0);
+
+            // Drag Gesture State
+            const isDragging = ref(false);
+            const startX = ref(0);
+            const startY = ref(0);
+            const dragX = ref(0);
+            const dragY = ref(0);
+            const hasMoved = ref(false);
+
+            // Filter / Search
+            const searchQuery = ref('');
+
+            // Modals
+            const singleModalOpen = ref(false);
+            const bulkModalOpen = ref(false);
+            const bulkText = ref('');
+            const formWord = ref({ id: '', word: '', translation: '' });
+
+            // Auth
+            const user = ref(null);
+            const authReady = ref(false);
+            const authMode = ref('login');
+            const authForm = ref({ email: '', password: '' });
+            const authError = ref('');
+            const authLoading = ref(false);
+            const fileInputRef = ref(null);
+
+            const leitnerBoxesInfo = [
+                { title: 'Нові / На вивченні', interval: 'Сьогодні' },
+                { title: 'Рівень 1', interval: '1 день' },
+                { title: 'Рівень 2', interval: '3 дні' },
+                { title: 'Рівень 3', interval: '7 днів' },
+                { title: 'Рівень 4', interval: '16 днів' },
+                { title: 'Рівень 5', interval: '30 днів' }
+            ];
+
+            const currentCard = computed(() => {
+                if (activeQueue.value.length === 0) return null;
+                const currentId = activeQueue.value[0];
+                return words.value.find(w => w.id === currentId) || null;
+            });
+
+            const nextCard = computed(() => {
+                if (activeQueue.value.length < 2) return null;
+                const nextId = activeQueue.value[1];
+                return words.value.find(w => w.id === nextId) || null;
+            });
+
+            const filteredWords = computed(() => {
+                return words.value.filter(w => {
+                    return w.word.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+                        w.translation.toLowerCase().includes(searchQuery.value.toLowerCase());
+                });
+            });
+
+            const sessionProgressPercentage = computed(() => {
+                if (initialSessionCount.value === 0) return 100;
+                const remaining = activeQueue.value.length;
+                const done = initialSessionCount.value - remaining;
+                return Math.max(0, Math.min(100, Math.round((done / initialSessionCount.value) * 100)));
+            });
+
+            const knowOverlayOpacity = computed(() => {
+                if (dragX.value <= 0) return 0;
+                return Math.min(1, dragX.value / 100);
+            });
+
+            const dontKnowOverlayOpacity = computed(() => {
+                if (dragX.value >= 0) return 0;
+                return Math.min(1, Math.abs(dragX.value) / 100);
+            });
+
+            const cardTransformStyle = computed(() => {
+                if (!isDragging.value && dragX.value === 0 && dragY.value === 0) {
+                    return {
+                        transform: 'translate3d(0, 0, 0) rotate(0deg)',
+                        transition: 'transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+                    };
+                }
+                const rotate = dragX.value * 0.08;
+                return {
+                    transform: `translate3d(${dragX.value}px, ${dragY.value}px, 0px) rotate(${rotate}deg)`,
+                    transition: isDragging.value ? 'none' : 'transform 0.3s ease-out'
+                };
+            });
+
+            // SUPABASE HELPERS
+            function check({ data, error }) {
+                if (error) throw new Error(translateError(error.message));
+                return data;
+            }
+
+            function translateError(message) {
+                const known = {
+                    'Invalid login credentials': 'Невірний email або пароль',
+                    'User already registered': 'Користувач з таким email вже існує',
+                    'Email not confirmed': 'Email не підтверджено. Перевірте пошту.',
+                    'Password should be at least 6 characters.': 'Пароль має містити щонайменше 6 символів'
+                };
+                if (/duplicate key/i.test(message)) return 'Таке слово вже є у вашій колекції';
+                return known[message] || message;
+            }
+
+            function toUser(authUser) {
+                return authUser ? { id: authUser.id, username: authUser.email.split('@')[0], email: authUser.email } : null;
+            }
+
+            // SPLIT ONE LINE INTO CELLS, RESPECTING "QUOTED, VALUES"
+            function splitCSVLine(line, delimiter) {
+                const cells = [];
+                let cell = '';
+                let inQuotes = false;
+                for (let i = 0; i < line.length; i++) {
+                    const ch = line[i];
+                    if (ch === '"') {
+                        if (inQuotes && line[i + 1] === '"') { cell += '"'; i++; }
+                        else inQuotes = !inQuotes;
+                    } else if (ch === delimiter && !inQuotes) {
+                        cells.push(cell);
+                        cell = '';
+                    } else {
+                        cell += ch;
+                    }
+                }
+                cells.push(cell);
+                return cells.map(c => c.trim().replace(/^'|'$/g, ''));
+            }
+
+            // PARSE CSV / TEXT INTO { word, translation } ITEMS
+            function parseCSVContent(csvText) {
+                const lines = csvText.replace(/^﻿/, '').split(/\r?\n/);
+                const parsed = [];
+
+                lines.forEach((line, index) => {
+                    const trimmed = line.trim();
+                    if (!trimmed) return;
+
+                    let parts;
+                    if (trimmed.includes('\t')) parts = splitCSVLine(trimmed, '\t');
+                    else if (trimmed.includes(';')) parts = splitCSVLine(trimmed, ';');
+                    else if (trimmed.includes(',')) parts = splitCSVLine(trimmed, ',');
+                    else parts = trimmed.split(/\s+[-–—]\s+/);
+
+                    if (parts.length < 2) return;
+                    const w = parts[0].trim();
+                    const t = parts.slice(1).join(', ').trim();
+
+                    // Skip header if present (e.g. "word,translation" or "English,Ukrainian")
+                    if (index === 0 && ['word', 'english', 'слово'].includes(w.toLowerCase())) return;
+
+                    if (w && t) parsed.push({ word: w, translation: t });
+                });
+
+                return parsed;
+            }
+
+            async function loadWords() {
+                try {
+                    words.value = check(await sb.from('words')
+                        .select('id, word, translation, box')
+                        .order('id', { ascending: false }));
+                } catch (err) {
+                    statusMessage.value = err.message;
+                    words.value = [];
+                }
+                startSession();
+            }
+
+            async function persistWord(card) {
+                try {
+                    check(await sb.from('words').update({ box: card.box }).eq('id', card.id));
+                } catch (err) {
+                    statusMessage.value = 'Не вдалося зберегти прогрес: ' + err.message;
+                }
+            }
+
+            // ADD MANY WORDS TO THE USER'S COLLECTION (skips words already in it)
+            async function importItems(items, sourceLabel) {
+                if (items.length === 0) {
+                    statusMessage.value = `${sourceLabel}: не знайдено жодного рядка у форматі «слово, переклад».`;
+                    return false;
+                }
+                const seen = new Set(words.value.map(w => w.word.toLowerCase()));
+                const fresh = [];
+                items.forEach(({ word, translation }) => {
+                    const w = word.trim().slice(0, 200);
+                    const t = translation.trim().slice(0, 500);
+                    if (!w || !t || seen.has(w.toLowerCase())) return;
+                    seen.add(w.toLowerCase());
+                    fresh.push({ word: w, translation: t });
+                });
+                const skipped = items.length - fresh.length;
+
+                try {
+                    const added = fresh.length
+                        ? check(await sb.from('words').insert(fresh).select('id, word, translation, box'))
+                        : [];
+                    added.forEach(w => {
+                        words.value.unshift(w);
+                        activeQueue.value.unshift(w.id);
+                    });
+                    initialSessionCount.value += added.length;
+                    statusMessage.value = `${sourceLabel}: додано ${added.length} слів` +
+                        (skipped ? `, пропущено ${skipped} (дублікати або порожні)` : '');
+                    return true;
+                } catch (err) {
+                    statusMessage.value = err.message;
+                    return false;
+                }
+            }
+
+            function openFilePicker() {
+                if (fileInputRef.value) fileInputRef.value.click();
+            }
+
+            async function onFileSelected(e) {
+                const file = e.target.files && e.target.files[0];
+                e.target.value = '';
+                if (!file) return;
+                const text = await file.text();
+                await importItems(parseCSVContent(text), `Файл «${file.name}»`);
+            }
+
+            // AUTH
+            function resetUserState() {
+                user.value = null;
+                words.value = [];
+                activeQueue.value = [];
+                initialSessionCount.value = 0;
+                currentTab.value = 'practice';
+                singleModalOpen.value = false;
+                bulkModalOpen.value = false;
+            }
+
+            async function submitAuth() {
+                authError.value = '';
+                if (!sb) {
+                    authError.value = 'Supabase не налаштовано: задайте змінні SUPABASE_URL і SUPABASE_KEY у GitHub (Settings → Secrets and variables → Actions → Variables)';
+                    return;
+                }
+                authLoading.value = true;
+                try {
+                    const credentials = { email: authForm.value.email.trim(), password: authForm.value.password };
+                    const data = check(authMode.value === 'login'
+                        ? await sb.auth.signInWithPassword(credentials)
+                        : await sb.auth.signUp(credentials));
+                    if (!data.session) {
+                        authError.value = 'Акаунт створено. Підтвердіть email за посиланням з листа і увійдіть.';
+                        authMode.value = 'login';
+                        return;
+                    }
+                    user.value = toUser(data.user);
+                    authForm.value = { email: '', password: '' };
+                    statusMessage.value = '';
+                    await loadWords();
+                } catch (err) {
+                    authError.value = err.message;
+                } finally {
+                    authLoading.value = false;
+                }
+            }
+
+            async function logout() {
+                try { await sb.auth.signOut(); } catch (e) { /* ignore */ }
+                resetUserState();
+                statusMessage.value = '';
+            }
+
+            function startSession() {
+                isFlipped.value = false;
+                sessionKnowCount.value = 0;
+                sessionRepeatCount.value = 0;
+
+                const dueIds = words.value.map(w => w.id);
+                activeQueue.value = dueIds.sort(() => Math.random() - 0.5);
+                initialSessionCount.value = activeQueue.value.length;
+            }
+
+            function toggleFlip() {
+                isFlipped.value = !isFlipped.value;
+            }
+
+            function triggerSwipe(direction) {
+                if (!currentCard.value) return;
+                const card = currentCard.value;
+
+                if (direction === 'right') {
+                    // KNOW -> Advance Box Level & Remove from current session
+                    card.box = Math.min(5, card.box + 1);
+                    sessionKnowCount.value++;
+                    activeQueue.value.shift();
+
+                    if (activeQueue.value.length === 0 && typeof confetti === 'function') {
+                        confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });
+                    }
+                } else {
+                    // DON'T KNOW -> Reset Box to 0 & Loop back into current session
+                    card.box = 0;
+                    sessionRepeatCount.value++;
+
+                    const currentId = activeQueue.value.shift();
+                    // Re-insert 3 cards later into active session queue
+                    const insertIndex = Math.min(activeQueue.value.length, 3);
+                    activeQueue.value.splice(insertIndex, 0, currentId);
+                }
+
+                persistWord(card);
+                isFlipped.value = false;
+                dragX.value = 0;
+                dragY.value = 0;
+            }
+
+            function onPointerDown(e) {
+                isDragging.value = true;
+                hasMoved.value = false;
+                startX.value = e.clientX || (e.touches && e.touches[0].clientX) || 0;
+                startY.value = e.clientY || (e.touches && e.touches[0].clientY) || 0;
+            }
+
+            function onPointerMove(e) {
+                if (!isDragging.value) return;
+                const currentX = e.clientX || (e.touches && e.touches[0].clientX) || 0;
+                const currentY = e.clientY || (e.touches && e.touches[0].clientY) || 0;
+
+                const deltaX = currentX - startX.value;
+                const deltaY = currentY - startY.value;
+
+                if (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5) {
+                    hasMoved.value = true;
+                }
+
+                dragX.value = deltaX;
+                dragY.value = deltaY;
+            }
+
+            function onPointerUp() {
+                if (!isDragging.value) return;
+                isDragging.value = false;
+
+                const threshold = 100;
+                if (dragX.value > threshold) {
+                    triggerSwipe('right');
+                } else if (dragX.value < -threshold) {
+                    triggerSwipe('left');
+                } else {
+                    if (!hasMoved.value) {
+                        toggleFlip();
+                    }
+                    dragX.value = 0;
+                    dragY.value = 0;
+                }
+            }
+
+            function getBoxCount(boxNum) {
+                return words.value.filter(w => w.box === boxNum).length;
+            }
+
+            function openAddModal() {
+                formWord.value = { id: '', word: '', translation: '' };
+                singleModalOpen.value = true;
+            }
+
+            function openBulkModal() {
+                bulkText.value = '';
+                bulkModalOpen.value = true;
+            }
+
+            function editWord(item) {
+                formWord.value = { ...item };
+                singleModalOpen.value = true;
+            }
+
+            async function saveFormWord() {
+                const word = formWord.value.word.trim();
+                const translation = formWord.value.translation.trim();
+                if (!word || !translation) return;
+
+                try {
+                    if (formWord.value.id) {
+                        const updated = check(await sb.from('words')
+                            .update({ word, translation })
+                            .eq('id', formWord.value.id)
+                            .select('id, word, translation, box')
+                            .single());
+                        const idx = words.value.findIndex(w => w.id === updated.id);
+                        if (idx !== -1) words.value[idx] = updated;
+                    } else {
+                        if (words.value.some(w => w.word.toLowerCase() === word.toLowerCase())) {
+                            statusMessage.value = `Слово «${word}» вже є у вашій колекції.`;
+                            return;
+                        }
+                        const newWord = check(await sb.from('words')
+                            .insert({ word, translation })
+                            .select('id, word, translation, box')
+                            .single());
+                        words.value.unshift(newWord);
+                        activeQueue.value.unshift(newWord.id);
+                        initialSessionCount.value++;
+                    }
+                    singleModalOpen.value = false;
+                } catch (err) {
+                    statusMessage.value = err.message;
+                }
+            }
+
+            async function processBulkImport() {
+                if (!bulkText.value.trim()) return;
+                if (await importItems(parseCSVContent(bulkText.value), 'Текст')) {
+                    bulkModalOpen.value = false;
+                }
+            }
+
+            async function deleteWord(id) {
+                try {
+                    check(await sb.from('words').delete().eq('id', id));
+                    words.value = words.value.filter(w => w.id !== id);
+                    activeQueue.value = activeQueue.value.filter(qId => qId !== id);
+                } catch (err) {
+                    statusMessage.value = err.message;
+                }
+            }
+
+            function handleKeydown(e) {
+                if (!user.value || singleModalOpen.value || bulkModalOpen.value || currentTab.value !== 'practice') return;
+
+                if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'ArrowDown') {
+                    e.preventDefault();
+                    toggleFlip();
+                } else if (e.code === 'ArrowLeft' || e.code === 'KeyA') {
+                    e.preventDefault();
+                    triggerSwipe('left');
+                } else if (e.code === 'ArrowRight' || e.code === 'KeyD') {
+                    e.preventDefault();
+                    triggerSwipe('right');
+                }
+            }
+
+            onMounted(async () => {
+                window.addEventListener('keydown', handleKeydown);
+                if (!sb) {
+                    authError.value = 'Supabase не налаштовано: задайте змінні SUPABASE_URL і SUPABASE_KEY у GitHub (Settings → Secrets and variables → Actions → Variables)';
+                    authReady.value = true;
+                    return;
+                }
+                try {
+                    const { data } = await sb.auth.getSession();
+                    user.value = toUser(data.session && data.session.user);
+                    if (user.value) await loadWords();
+                } catch (err) {
+                    authError.value = 'Не вдалося підключитися до Supabase: ' + err.message;
+                } finally {
+                    authReady.value = true;
+                }
+                sb.auth.onAuthStateChange(event => {
+                    if (event === 'SIGNED_OUT') resetUserState();
+                });
+            });
+
+            onUnmounted(() => {
+                window.removeEventListener('keydown', handleKeydown);
+            });
+
+            return {
+                currentTab,
+                words,
+                activeQueue,
+                currentCard,
+                nextCard,
+                isFlipped,
+                sessionKnowCount,
+                sessionRepeatCount,
+                sessionProgressPercentage,
+                knowOverlayOpacity,
+                dontKnowOverlayOpacity,
+                cardTransformStyle,
+                statusMessage,
+                searchQuery,
+                filteredWords,
+                singleModalOpen,
+                bulkModalOpen,
+                bulkText,
+                formWord,
+                leitnerBoxesInfo,
+                user,
+                authReady,
+                authMode,
+                authForm,
+                authError,
+                authLoading,
+                fileInputRef,
+                submitAuth,
+                logout,
+                openFilePicker,
+                onFileSelected,
+                startSession,
+                toggleFlip,
+                triggerSwipe,
+                onPointerDown,
+                onPointerMove,
+                onPointerUp,
+                getBoxCount,
+                openAddModal,
+                openBulkModal,
+                editWord,
+                saveFormWord,
+                processBulkImport,
+                deleteWord
+            };
+        }
+    }).mount('#app');
+</script>
+</body>
+</html>
