@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <title>LinguaSwipe</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+<header>
+    <img src="icons/icon-48.png" alt="" width="28" height="28">
+    <div>
+        <h1>LinguaSwipe</h1>
+        <p class="muted" id="subtitle">Додавайте слова прямо зі сторінок</p>
+    </div>
+</header>
+
+<!-- Немає config.js -->
+<section id="view-config" hidden>
+    <p class="error">Розширення не налаштоване: скопіюйте <code>config.example.js</code> у <code>config.js</code>,
+        підставте URL і anon-ключ Supabase і перезавантажте розширення.</p>
+</section>
+
+<!-- Вхід -->
+<section id="view-login" hidden>
+    <form id="login-form">
+        <label for="email">Email</label>
+        <input id="email" type="email" required autocomplete="email" placeholder="you@example.com">
+        <label for="password">Пароль</label>
+        <input id="password" type="password" required autocomplete="current-password" placeholder="••••••">
+        <p class="error" id="login-error"></p>
+        <button type="submit" class="primary" id="login-button">Увійти</button>
+    </form>
+    <p class="muted small">Той самий акаунт, що й у <a href="https://anatoliidolia.github.io/LinguaSwipe/" target="_blank">LinguaSwipe</a>.</p>
+</section>
+
+<!-- Користувач увійшов -->
+<section id="view-main" hidden>
+    <div class="account">
+        <span id="user-email"></span>
+        <button type="button" class="link" id="logout-button">Вийти</button>
+    </div>
+
+    <form id="add-form" autocomplete="off">
+        <label for="add-word">Нове слово</label>
+        <input id="add-word" maxlength="200" required placeholder="Слово англійською">
+        <input id="add-translation" maxlength="500" required placeholder="Переклад">
+        <p class="hint" id="add-hint"></p>
+        <button type="submit" class="primary" id="add-button">Надіслати</button>
+    </form>
+
+    <label class="toggle">
+        <input type="checkbox" id="auto-popup">
+        <span>Показувати поле перекладу при виділенні слова</span>
+    </label>
+    <p class="muted small">Також працює через контекстне меню: правий клік по виділеному → «Додати у LinguaSwipe».</p>
+
+    <h2>Останні слова</h2>
+    <ul id="recent"><li class="muted">Завантаження…</li></ul>
+
+    <a class="open-app" href="https://anatoliidolia.github.io/LinguaSwipe/" target="_blank">Відкрити LinguaSwipe →</a>
+</section>
+
+<script src="popup.js"></script>
+</body>
+</html>

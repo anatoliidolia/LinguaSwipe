@@ -892,6 +892,24 @@
                 return known[message] || message;
             }
 
+            // Дозволені символи — ті самі правила, що й у базі (supabase_setup.sql).
+            // Слово: латиниця, цифри, пробіл, апостроф, дефіс, крапка. Переклад: кирилиця/латиниця,
+            // цифри і звичайна пунктуація. Тож HTML/JS (< > & { } ` = тощо) у словник не потрапить.
+            const WORD_PATTERN = /^[A-Za-z][A-Za-z0-9 '’ʼ.-]*$/;
+            const TRANSLATION_PATTERN = /^[A-Za-zА-яЁёЄєІіЇїҐґ0-9«"(][A-Za-zА-яЁёЄєІіЇїҐґ0-9 ,;:.!?()'’ʼ"«»\/–—-]*$/;
+
+            // Повертає текст помилки або '' якщо пара коректна
+            function validateWord(word, translation) {
+                if (!word || !translation) return 'Введіть слово і переклад';
+                if (word.length > 200 || !WORD_PATTERN.test(word)) {
+                    return `Слово «${word.slice(0, 40)}» містить недозволені символи: лише англійські літери, цифри, пробіл, апостроф, дефіс і крапка`;
+                }
+                if (translation.length > 500 || !TRANSLATION_PATTERN.test(translation)) {
+                    return 'Переклад містить недозволені символи: лише літери, цифри і пунктуація , ; : . ! ? ( ) « » " \' - /';
+                }
+                return '';
+            }
+
             function toUser(authUser) {
                 return authUser ? { id: authUser.id, username: authUser.email.split('@')[0], email: authUser.email } : null;
             }
@@ -929,6 +947,8 @@
                     let parts;
                     if (trimmed.includes('\t')) parts = splitCSVLine(trimmed, '\t');
                     else if (trimmed.includes(';')) parts = splitCSVLine(trimmed, ';');
+                    // "Endure - Витримувати, терпіти": тире до першої коми — роздільник, а кома — частина перекладу
+                    else if (/^[^,"]+?\s+[-–—]\s+/.test(trimmed)) parts = trimmed.split(/\s+[-–—]\s+/);
                     else if (trimmed.includes(',')) parts = splitCSVLine(trimmed, ',');
                     else parts = trimmed.split(/\s+[-–—]\s+/);
 
@@ -1031,7 +1051,7 @@
                 items.forEach(({ word, translation }) => {
                     const w = word.trim().slice(0, 200);
                     const t = translation.trim().slice(0, 500);
-                    if (!w || !t || seen.has(w.toLowerCase())) return;
+                    if (validateWord(w, t) || seen.has(w.toLowerCase())) return;
                     seen.add(w.toLowerCase());
                     fresh.push({ word: w, translation: t });
                 });
@@ -1047,7 +1067,7 @@
                     });
                     initialSessionCount.value += added.length;
                     statusMessage.value = `${sourceLabel}: додано ${added.length} слів` +
-                        (skipped ? `, пропущено ${skipped} (дублікати або порожні)` : '');
+                        (skipped ? `, пропущено ${skipped} (дублікати, порожні або з недозволеними символами)` : '');
                     return true;
                 } catch (err) {
                     statusMessage.value = err.message;
@@ -1244,6 +1264,11 @@
                 const word = formWord.value.word.trim();
                 const translation = formWord.value.translation.trim();
                 if (!word || !translation) return;
+                const invalid = validateWord(word, translation);
+                if (invalid) {
+                    statusMessage.value = invalid;
+                    return;
+                }
 
                 try {
                     if (formWord.value.id) {
