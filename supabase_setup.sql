@@ -78,3 +78,25 @@ create policy "Users delete own progress" on public.word_progress
 
 revoke all on public.word_progress from anon;
 grant select, insert, update, delete on public.word_progress to authenticated;
+
+-- ===== Дозволені символи (захист від HTML/JS-ін'єкцій) =====
+-- Слово: латиниця, цифри, пробіл, апостроф, дефіс, крапка; починається з літери.
+-- Переклад: кирилиця/латиниця, цифри і звичайна пунктуація. Без < > & { } ` = $ \ тощо.
+-- Ті самі правила перевіряють сайт (index.html) і розширення (chrome-extension/background.js).
+-- NOT VALID: правило діє для всіх нових і змінених рядків; старі рядки можна знайти запитом нижче.
+alter table public.words drop constraint if exists words_word_chars;
+alter table public.words add constraint words_word_chars
+    check (word ~ '^[A-Za-z][A-Za-z0-9 ''’ʼ.-]*$') not valid;
+
+alter table public.words drop constraint if exists words_translation_chars;
+alter table public.words add constraint words_translation_chars
+    check (translation ~ '^[A-Za-zА-яЁёЄєІіЇїҐґ0-9«"(][A-Za-zА-яЁёЄєІіЇїҐґ0-9 ,;:.!?()''’ʼ"«»/–—-]*$') not valid;
+
+alter table public.word_progress drop constraint if exists word_progress_key_chars;
+alter table public.word_progress add constraint word_progress_key_chars
+    check (word_key ~ '^[a-z][a-z0-9 ''’ʼ.-]*$') not valid;
+
+-- Слова, що не відповідають правилам (виправте або видаліть їх):
+-- select id, word, translation from public.words
+-- where word !~ '^[A-Za-z][A-Za-z0-9 ''’ʼ.-]*$'
+--    or translation !~ '^[A-Za-zА-яЁёЄєІіЇїҐґ0-9«"(][A-Za-zА-яЁёЄєІіЇїҐґ0-9 ,;:.!?()''’ʼ"«»/–—-]*$';
