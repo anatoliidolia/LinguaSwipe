@@ -373,6 +373,7 @@
                                 <h2 class="text-4xl sm:text-5xl font-black text-white tracking-tight leading-tight">
                                     {{ currentCard.word }}
                                 </h2>
+                                <p v-if="currentCard.transcription" class="mt-3 text-lg text-slate-400 font-medium">[{{ currentCard.transcription }}]</p>
                             </div>
 
                             <!-- Card Front Hint -->
@@ -397,6 +398,7 @@
 
                             <!-- Main Ukrainian Translation Display -->
                             <div class="text-center my-auto px-2">
+                                <p v-if="currentCard.transcription" class="text-sm text-slate-500 mb-3">{{ currentCard.word }} [{{ currentCard.transcription }}]</p>
                                 <span class="text-xs text-slate-500 uppercase font-semibold tracking-widest block mb-3">Українською:</span>
                                 <h3 class="text-3xl sm:text-4xl font-black text-emerald-400 leading-snug">
                                     {{ currentCard.translation }}
@@ -549,7 +551,10 @@
                         class="glass-card p-4 rounded-2xl border border-slate-800 hover:border-slate-700 transition-all flex items-center justify-between">
 
                     <div class="flex-1 pr-3">
-                        <h3 class="font-extrabold text-base text-white mb-0.5">{{ item.word }}</h3>
+                        <h3 class="font-extrabold text-base text-white mb-0.5">
+                            {{ item.word }}
+                            <span v-if="item.transcription" class="font-normal text-sm text-slate-400 ml-1">[{{ item.transcription }}]</span>
+                        </h3>
                         <p class="text-emerald-400 font-semibold text-sm">{{ item.translation }}</p>
                     </div>
 
@@ -647,6 +652,15 @@
                 </div>
 
                 <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">Транскрипція <span class="text-slate-500">(необов'язково)</span></label>
+                    <input
+                            v-model="formWord.transcription"
+                            type="text"
+                            placeholder="e.g. rɪˈlʌktənt"
+                            class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-sky-500">
+                </div>
+
+                <div>
                     <label class="block text-xs font-medium text-slate-400 mb-1">Переклад українською *</label>
                     <input
                             v-model="formWord.translation"
@@ -685,13 +699,14 @@
 
             <p class="text-xs text-slate-400 mb-4">
                 Вставте список слів у форматі: <code class="text-sky-300 font-mono">Слово, Переклад</code> або <code class="text-sky-300 font-mono">Слово - Переклад</code>.
+                Транскрипцію можна додати другою колонкою в квадратних дужках: <code class="text-sky-300 font-mono">Слово, [транскрипція], Переклад</code>.
                 Слова, які вже є у вашій колекції, буде пропущено.
             </p>
 
             <textarea
                     v-model="bulkText"
                     rows="8"
-                    placeholder="reluctant, неохочий&#10;persistent, наполегливий&#10;comprehensive, всебічний"
+                    placeholder="reluctant, [rɪˈlʌktənt], неохочий&#10;persistent, [], наполегливий&#10;comprehensive, всебічний"
                     class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-white font-mono focus:outline-none focus:border-sky-500 mb-4">
         </textarea>
 
@@ -782,7 +797,7 @@
             const singleModalOpen = ref(false);
             const bulkModalOpen = ref(false);
             const bulkText = ref('');
-            const formWord = ref({ id: '', word: '', translation: '' });
+            const formWord = ref({ id: '', word: '', transcription: '', translation: '' });
 
             // Auth
             const user = ref(null);
@@ -897,10 +912,22 @@
             // цифри і звичайна пунктуація. Тож HTML/JS (< > & { } ` = тощо) у словник не потрапить.
             const WORD_PATTERN = /^[A-Za-z][A-Za-z0-9 '’ʼ.-]*$/;
             const TRANSLATION_PATTERN = /^[A-Za-zА-яЁёЄєІіЇїҐґ0-9«"(][A-Za-zА-яЁёЄєІіЇїҐґ0-9 ,;:.!?()'’ʼ"«»\/–—-]*$/;
+            // Транскрипція (IPA): будь-які символи, крім < > & { } ` = $ \ " і дужок [ ]
+            const TRANSCRIPTION_PATTERN = /^[^<>&{}`=$\\"\[\]]+$/;
 
-            // Повертає текст помилки або '' якщо пара коректна
-            function validateWord(word, translation) {
+            // "[ˈwɜːd]", "/ˈwɜːd/" або "ˈwɜːd" → "ˈwɜːd"; "[]" → ''
+            function normalizeTranscription(value) {
+                const t = String(value || '').replace(/\s+/g, ' ').trim();
+                const m = t.match(/^\[(.*)\]$/) || t.match(/^\/(.*)\/$/);
+                return (m ? m[1] : t).trim();
+            }
+
+            // Повертає текст помилки або '' якщо пара коректна (транскрипція — уже нормалізована)
+            function validateWord(word, translation, transcription = '') {
                 if (!word || !translation) return 'Введіть слово і переклад';
+                if (transcription && (transcription.length > 200 || !TRANSCRIPTION_PATTERN.test(transcription))) {
+                    return 'Транскрипція містить недозволені символи: < > & { } ` = $ \\ " [ ]';
+                }
                 if (word.length > 200 || !WORD_PATTERN.test(word)) {
                     return `Слово «${word.slice(0, 40)}» містить недозволені символи: лише англійські літери, цифри, пробіл, апостроф, дефіс і крапка`;
                 }
@@ -935,7 +962,8 @@
                 return cells.map(c => c.trim().replace(/^'|'$/g, ''));
             }
 
-            // PARSE CSV / TEXT INTO { word, translation } ITEMS
+            // PARSE CSV / TEXT INTO { word, transcription, translation } ITEMS
+            // Рядок: "слово, переклад" або "слово, [транскрипція], переклад" ("[]" — без транскрипції)
             function parseCSVContent(csvText) {
                 const lines = csvText.replace(/^﻿/, '').split(/\r?\n/);
                 const parsed = [];
@@ -954,12 +982,18 @@
 
                     if (parts.length < 2) return;
                     const w = parts[0].trim();
-                    const t = parts.slice(1).join(', ').trim();
+                    let rest = parts.slice(1);
+                    let tr = '';
+                    if (rest.length > 1 && /^(\[.*\]|\/.*\/)$/.test(rest[0].trim())) {
+                        tr = normalizeTranscription(rest[0]);
+                        rest = rest.slice(1);
+                    }
+                    const t = rest.join(', ').trim();
 
                     // Skip header if present (e.g. "word,translation" or "English,Ukrainian")
                     if (index === 0 && ['word', 'english', 'слово'].includes(w.toLowerCase())) return;
 
-                    if (w && t) parsed.push({ word: w, translation: t });
+                    if (w && t) parsed.push({ word: w, transcription: tr, translation: t });
                 });
 
                 return parsed;
@@ -992,9 +1026,11 @@
                 }
                 return shared.map((w, i) => {
                     const key = w.word.toLowerCase();
-                    return { id: `shared-${i}`, key, word: w.word, translation: w.translation, box: progress[key] || 0 };
+                    return { id: `shared-${i}`, key, word: w.word, transcription: w.transcription, translation: w.translation, box: progress[key] || 0 };
                 });
             }
+
+            const WORD_COLUMNS = 'id, word, transcription, translation, box';
 
             let loadCounter = 0;
             async function loadWords() {
@@ -1004,7 +1040,7 @@
                     loaded = readOnly.value
                         ? await loadSharedWords()
                         : check(await sb.from('words')
-                            .select('id, word, translation, box')
+                            .select(WORD_COLUMNS)
                             .order('id', { ascending: false }));
                 } catch (err) {
                     statusMessage.value = err.message;
@@ -1048,18 +1084,19 @@
                 }
                 const seen = new Set(words.value.map(w => w.word.toLowerCase()));
                 const fresh = [];
-                items.forEach(({ word, translation }) => {
+                items.forEach(({ word, transcription, translation }) => {
                     const w = word.trim().slice(0, 200);
+                    const tr = normalizeTranscription(transcription);
                     const t = translation.trim().slice(0, 500);
-                    if (validateWord(w, t) || seen.has(w.toLowerCase())) return;
+                    if (validateWord(w, t, tr) || seen.has(w.toLowerCase())) return;
                     seen.add(w.toLowerCase());
-                    fresh.push({ word: w, translation: t });
+                    fresh.push({ word: w, transcription: tr || null, translation: t });
                 });
                 const skipped = items.length - fresh.length;
 
                 try {
                     const added = fresh.length
-                        ? check(await sb.from('words').insert(fresh).select('id, word, translation, box'))
+                        ? check(await sb.from('words').insert(fresh).select(WORD_COLUMNS))
                         : [];
                     added.forEach(w => {
                         words.value.unshift(w);
@@ -1246,7 +1283,7 @@
             }
 
             function openAddModal() {
-                formWord.value = { id: '', word: '', translation: '' };
+                formWord.value = { id: '', word: '', transcription: '', translation: '' };
                 singleModalOpen.value = true;
             }
 
@@ -1256,15 +1293,16 @@
             }
 
             function editWord(item) {
-                formWord.value = { ...item };
+                formWord.value = { ...item, transcription: item.transcription || '' };
                 singleModalOpen.value = true;
             }
 
             async function saveFormWord() {
                 const word = formWord.value.word.trim();
                 const translation = formWord.value.translation.trim();
+                const transcription = normalizeTranscription(formWord.value.transcription);
                 if (!word || !translation) return;
-                const invalid = validateWord(word, translation);
+                const invalid = validateWord(word, translation, transcription);
                 if (invalid) {
                     statusMessage.value = invalid;
                     return;
@@ -1273,9 +1311,9 @@
                 try {
                     if (formWord.value.id) {
                         const updated = check(await sb.from('words')
-                            .update({ word, translation })
+                            .update({ word, transcription: transcription || null, translation })
                             .eq('id', formWord.value.id)
-                            .select('id, word, translation, box')
+                            .select(WORD_COLUMNS)
                             .single());
                         const idx = words.value.findIndex(w => w.id === updated.id);
                         if (idx !== -1) words.value[idx] = updated;
@@ -1285,8 +1323,8 @@
                             return;
                         }
                         const newWord = check(await sb.from('words')
-                            .insert({ word, translation })
-                            .select('id, word, translation, box')
+                            .insert({ word, transcription: transcription || null, translation })
+                            .select(WORD_COLUMNS)
                             .single());
                         words.value.unshift(newWord);
                         activeQueue.value.unshift(newWord.id);
