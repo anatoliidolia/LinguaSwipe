@@ -112,9 +112,20 @@ async function logout() {
 // Дозволені символи — ті самі правила, що й у базі (supabase_setup.sql) і на сайті (index.html)
 const WORD_PATTERN = /^[A-Za-z][A-Za-z0-9 '’ʼ.-]*$/;
 const TRANSLATION_PATTERN = /^[A-Za-zА-яЁёЄєІіЇїҐґ0-9«"(][A-Za-zА-яЁёЄєІіЇїҐґ0-9 ,;:.!?()'’ʼ"«»\/–—-]*$/;
+const TRANSCRIPTION_PATTERN = /^[^<>&{}`=$\\"\[\]]+$/;
 
-function validateWord(word, translation) {
+// "[ˈwɜːd]", "/ˈwɜːd/" або "ˈwɜːd" → "ˈwɜːd"
+function normalizeTranscription(value) {
+    const t = String(value || '').replace(/\s+/g, ' ').trim();
+    const m = t.match(/^\[(.*)\]$/) || t.match(/^\/(.*)\/$/);
+    return (m ? m[1] : t).trim();
+}
+
+function validateWord(word, translation, transcription = '') {
     if (!word || !translation) return 'Введіть слово і переклад';
+    if (transcription && (transcription.length > 200 || !TRANSCRIPTION_PATTERN.test(transcription))) {
+        return 'Транскрипція: недозволені символи < > & { } ` = $ \\ " [ ]';
+    }
     if (word.length > 200 || !WORD_PATTERN.test(word)) {
         return 'Слово: лише англійські літери, цифри, пробіл, апостроф, дефіс і крапка';
     }
@@ -130,13 +141,13 @@ function exactIlike(value) {
 }
 
 async function findOwnWord(word, token) {
-    const rows = await request(`/rest/v1/words?select=id,word,translation&word=ilike.${exactIlike(word)}&limit=1`, { token });
+    const rows = await request(`/rest/v1/words?select=id,word,transcription,translation&word=ilike.${exactIlike(word)}&limit=1`, { token });
     return rows[0] || null;
 }
 
-async function findSharedTranslation(word, token) {
-    const rows = await request(`/rest/v1/rpc/public_words?select=translation&word=ilike.${exactIlike(word)}&limit=1`, { token });
-    return rows[0] ? rows[0].translation : null;
+async function findSharedWord(word, token) {
+    const rows = await request(`/rest/v1/rpc/public_words?select=translation,transcription&word=ilike.${exactIlike(word)}&limit=1`, { token });
+    return rows[0] || null;
 }
 
 async function machineTranslation(word) {
@@ -152,46 +163,48 @@ async function machineTranslation(word) {
 // Що вже відомо про слово: чи є воно у користувача і який переклад запропонувати
 async function lookup(word) {
     word = String(word || '').trim();
-    if (!WORD_PATTERN.test(word) || word.length > 200) return { existing: null, suggestion: null, source: null };
+    if (!WORD_PATTERN.test(word) || word.length > 200) return { existing: null, suggestion: null, transcription: null, source: null };
     const token = await getAccessToken();
     const own = await findOwnWord(word, token);
-    if (own) return { existing: own, suggestion: own.translation, source: 'own' };
+    if (own) return { existing: own, suggestion: own.translation, transcription: own.transcription, source: 'own' };
 
-    const shared = await findSharedTranslation(word, token).catch(() => null);
-    if (shared) return { existing: null, suggestion: shared, source: 'shared' };
+    const shared = await findSharedWord(word, token).catch(() => null);
+    if (shared) return { existing: null, suggestion: shared.translation, transcription: shared.transcription, source: 'shared' };
 
     const machine = await machineTranslation(word).catch(() => null);
-    return { existing: null, suggestion: machine, source: machine ? 'machine' : null };
+    return { existing: null, suggestion: machine, transcription: null, source: machine ? 'machine' : null };
 }
 
-async function saveWord({ word, translation, id }) {
+async function saveWord({ word, transcription, translation, id }) {
     word = String(word || '').replace(/\s+/g, ' ').trim();
+    transcription = normalizeTranscription(transcription);
     translation = String(translation || '').replace(/\s+/g, ' ').trim();
-    const invalid = validateWord(word, translation);
+    const invalid = validateWord(word, translation, transcription);
     if (invalid) throw new Error(invalid);
 
     const token = await getAccessToken();
     const prefer = { Prefer: 'return=representation' };
+    const body = { word, transcription: transcription || null, translation };
 
     if (!id) {
         const own = await findOwnWord(word, token);
         if (own) id = own.id;
     }
     if (id) {
-        const rows = await request(`/rest/v1/words?id=eq.${encodeURIComponent(id)}&select=id,word,translation`, {
-            method: 'PATCH', token, headers: prefer, body: { word, translation }
+        const rows = await request(`/rest/v1/words?id=eq.${encodeURIComponent(id)}&select=id,word,transcription,translation`, {
+            method: 'PATCH', token, headers: prefer, body
         });
         return { action: 'updated', word: rows[0] };
     }
-    const rows = await request('/rest/v1/words?select=id,word,translation', {
-        method: 'POST', token, headers: prefer, body: { word, translation }
+    const rows = await request('/rest/v1/words?select=id,word,transcription,translation', {
+        method: 'POST', token, headers: prefer, body
     });
     return { action: 'added', word: rows[0] };
 }
 
 async function recentWords() {
     const token = await getAccessToken();
-    return request('/rest/v1/words?select=id,word,translation&order=id.desc&limit=5', { token });
+    return request('/rest/v1/words?select=id,word,transcription,translation&order=id.desc&limit=5', { token });
 }
 
 // ===== MESSAGES =====

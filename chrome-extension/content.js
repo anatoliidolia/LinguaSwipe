@@ -122,6 +122,7 @@
         }
         .close:hover { color: #e2e8f0; }
         label { display: block; font-size: 11px; color: #94a3b8; margin: 6px 0 3px; }
+        .opt { color: #64748b; }
         input {
             width: 100%; box-sizing: border-box; background: #1e293b; color: #f8fafc;
             border: 1px solid #334155; border-radius: 10px; padding: 8px 10px; font: inherit; outline: none;
@@ -155,6 +156,8 @@
                 </div>
                 <label>Слово</label>
                 <input class="word" name="word" maxlength="200" required>
+                <label>Транскрипція <span class="opt">(необов'язково)</span></label>
+                <input class="transcription" name="transcription" maxlength="200" placeholder="напр. ˈwɜːd">
                 <label>Переклад</label>
                 <input class="translation" name="translation" maxlength="500" placeholder="Шукаю переклад…" required>
                 <div class="hint"></div>
@@ -164,6 +167,7 @@
 
         const box = root.querySelector('.box');
         const wordInput = root.querySelector('.word');
+        const transcriptionInput = root.querySelector('.transcription');
         const translationInput = root.querySelector('.translation');
         const hint = root.querySelector('.hint');
         const sendButton = root.querySelector('.send');
@@ -192,15 +196,18 @@
 
         // Підказати переклад: з власного словника, загального або автоперекладом
         let userTyped = false;
+        let userTypedTranscription = false;
         translationInput.addEventListener('input', () => { userTyped = true; });
+        transcriptionInput.addEventListener('input', () => { userTypedTranscription = true; });
         const current = host;
         send({ type: 'lookup', word: text }).then(({ data, error }) => {
             if (host !== current) return;
             translationInput.placeholder = 'Введіть переклад';
             if (error) { setHint(error, 'err'); return; }
             if (data.suggestion && !userTyped) translationInput.value = data.suggestion;
+            if (data.transcription && !userTypedTranscription) transcriptionInput.value = data.transcription;
             if (data.existing) {
-                setHint('Слово вже є у вашому словнику — можна оновити переклад', 'warn');
+                setHint('Слово вже є у вашому словнику — можна оновити переклад і транскрипцію', 'warn');
                 sendButton.textContent = 'Оновити';
             } else if (data.source === 'shared') {
                 setHint('Переклад із загального словника');
@@ -212,6 +219,7 @@
         box.addEventListener('submit', async event => {
             event.preventDefault();
             const word = wordInput.value.trim();
+            const transcription = transcriptionInput.value.trim();
             const translation = translationInput.value.trim();
             if (!word || !translation) {
                 setHint('Введіть слово і переклад', 'err');
@@ -219,14 +227,14 @@
             }
             sendButton.disabled = true;
             setHint('Надсилаю…');
-            const { data, error } = await send({ type: 'saveWord', word, translation });
+            const { data, error } = await send({ type: 'saveWord', word, transcription, translation });
             if (host !== current) return;
             if (error) {
                 sendButton.disabled = false;
                 setHint(error, 'err');
                 return;
             }
-            setHint(data.action === 'updated' ? '✓ Переклад оновлено' : '✓ Додано у словник', 'ok');
+            setHint(data.action === 'updated' ? '✓ Слово оновлено' : '✓ Додано у словник', 'ok');
             setTimeout(() => { if (host === current) closePopover(); }, 1200);
         });
 

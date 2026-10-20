@@ -44,7 +44,7 @@ async function loadRecent() {
         return;
     }
     if (!data.length) list.append(item(null, 'Поки що порожньо'));
-    data.forEach(w => list.append(item(w.word, w.translation)));
+    data.forEach(w => list.append(item(w.transcription ? `${w.word} [${w.transcription}]` : w.word, w.translation)));
 }
 
 function item(word, translation) {
@@ -97,7 +97,9 @@ $('add-word').addEventListener('change', async () => {
     $('add-translation').placeholder = 'Шукаю переклад…';
     const { data } = await send({ type: 'lookup', word });
     $('add-translation').placeholder = 'Переклад';
-    if (data && data.suggestion && !$('add-translation').value.trim() && $('add-word').value.trim() === word) {
+    if (!data || $('add-word').value.trim() !== word) return;
+    if (data.transcription && !$('add-transcription').value.trim()) $('add-transcription').value = data.transcription;
+    if (data.suggestion && !$('add-translation').value.trim()) {
         $('add-translation').value = data.suggestion;
         setHint(data.existing ? 'Слово вже є у словнику — переклад буде оновлено' : '');
     }
@@ -110,12 +112,14 @@ $('add-form').addEventListener('submit', async event => {
     const { data, error } = await send({
         type: 'saveWord',
         word: $('add-word').value,
+        transcription: $('add-transcription').value,
         translation: $('add-translation').value
     });
     $('add-button').disabled = false;
     if (error) return setHint(error, 'err');
-    setHint(data.action === 'updated' ? '✓ Переклад оновлено' : '✓ Додано у словник', 'ok');
+    setHint(data.action === 'updated' ? '✓ Слово оновлено' : '✓ Додано у словник', 'ok');
     $('add-word').value = '';
+    $('add-transcription').value = '';
     $('add-translation').value = '';
     $('add-word').focus();
     loadRecent();
