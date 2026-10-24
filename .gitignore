@@ -2,3 +2,8 @@
 /linguaswipe_netlify.zip
 /my_words_anatolii.csv
 /chrome-extension/config.js
+/linguaswipe-chrome-extension.zip
+/node_modules/
+/dist/
+.env.local
+.env.*.local

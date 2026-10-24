@@ -1,5 +1,6 @@
-# Публікує index.html на GitHub Pages, підставляючи налаштування Supabase
-# зі змінних репозиторію (Settings → Secrets and variables → Actions → Variables).
+# Збирає Vue-додаток (Vite) і публікує dist/ на GitHub Pages.
+# Налаштування Supabase беруться зі змінних репозиторію
+# (Settings → Secrets and variables → Actions → Variables) і вбудовуються в збірку.
 name: Deploy to GitHub Pages
 
 on:
@@ -25,7 +26,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Insert Supabase settings
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Check Supabase settings
         env:
           SUPABASE_URL: ${{ vars.SUPABASE_URL }}
           SUPABASE_KEY: ${{ vars.SUPABASE_KEY }}
@@ -34,13 +40,18 @@ jobs:
             echo "::error::Задайте змінні SUPABASE_URL і SUPABASE_KEY у Settings → Secrets and variables → Actions → Variables"
             exit 1
           fi
-          mkdir _site
-          sed -e "s#__SUPABASE_URL__#${SUPABASE_URL%/}#" -e "s#__SUPABASE_KEY__#${SUPABASE_KEY}#" index.html > _site/index.html
-          cp -R manifest.json sw.js icons _site/
+
+      - run: npm ci
+
+      - name: Build
+        env:
+          VITE_SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          VITE_SUPABASE_KEY: ${{ vars.SUPABASE_KEY }}
+        run: npm run build
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: _site
+          path: dist
       - id: deployment
         uses: actions/deploy-pages@v4

@@ -1,7 +1,12 @@
 // LinguaSwipe service worker: lets the app open fast and offline.
 // Supabase requests (login, words) are never cached — they always go to the network.
 
-const CACHE = 'linguaswipe-v1';
+// Обидва значення підставляє при збірці плагін у vite.config.js:
+// версія змінюється з кожним деплоєм (старий кеш видаляється), список — зібрані JS/CSS з хешами.
+const BUILD_VERSION = '__BUILD_VERSION__';
+const BUILD_ASSETS = [/* __BUILD_ASSETS__ */];
+
+const CACHE = 'linguaswipe-' + BUILD_VERSION;
 const APP_SHELL = [
     './',
     './index.html',
@@ -9,12 +14,10 @@ const APP_SHELL = [
     './icons/icon.svg',
     './icons/icon-192.png',
     './icons/icon-512.png',
-    './icons/apple-touch-icon.png'
+    './icons/apple-touch-icon.png',
+    ...BUILD_ASSETS
 ];
 const CDN_HOSTS = [
-    'cdn.tailwindcss.com',
-    'unpkg.com',
-    'cdn.jsdelivr.net',
     'cdnjs.cloudflare.com',
     'fonts.googleapis.com',
     'fonts.gstatic.com'
@@ -33,13 +36,28 @@ self.addEventListener('activate', event => {
     );
 });
 
+function cacheFirst(request) {
+    return caches.match(request).then(cached => cached || fetch(request).then(response => {
+        if (response.ok || response.type === 'opaque') {
+            const copy = response.clone();
+            caches.open(CACHE).then(cache => cache.put(request, copy));
+        }
+        return response;
+    }));
+}
+
 self.addEventListener('fetch', event => {
     const request = event.request;
     if (request.method !== 'GET') return;
     const url = new URL(request.url);
 
-    // Own pages: network first so updates arrive immediately, cache as offline fallback
     if (url.origin === self.location.origin) {
+        // Зібрані файли з хешем у назві (assets/index-a1b2c3.js) ніколи не змінюються
+        if (url.pathname.includes('/assets/')) {
+            event.respondWith(cacheFirst(request));
+            return;
+        }
+        // Own pages: network first so updates arrive immediately, cache as offline fallback
         event.respondWith(
             fetch(request)
                 .then(response => {
@@ -55,17 +73,9 @@ self.addEventListener('fetch', event => {
         return;
     }
 
-    // Libraries and fonts from CDNs: cache first (their URLs are versioned)
+    // Icons and fonts from CDNs: cache first (their URLs are versioned)
     if (CDN_HOSTS.includes(url.hostname)) {
-        event.respondWith(
-            caches.match(request).then(cached => cached || fetch(request).then(response => {
-                if (response.ok || response.type === 'opaque') {
-                    const copy = response.clone();
-                    caches.open(CACHE).then(cache => cache.put(request, copy));
-                }
-                return response;
-            }))
-        );
+        event.respondWith(cacheFirst(request));
     }
     // Everything else (Supabase API) goes straight to the network.
 });
