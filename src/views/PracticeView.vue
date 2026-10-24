@@ -96,8 +96,9 @@ onUnmounted(() => window.removeEventListener('keydown', handleKeydown));
             <div class="w-20 h-20 rounded-full bg-sky-500/20 text-sky-400 flex items-center justify-center text-4xl mb-4 border border-sky-500/40">
                 <i class="fa-solid fa-box-open"></i>
             </div>
-            <h2 class="text-2xl font-extrabold text-white mb-2">{{ wordsStore.readOnly ? 'Загальний словник порожній' : 'Ваша колекція порожня' }}</h2>
-            <p v-if="wordsStore.readOnly" class="text-slate-400 text-sm max-w-xs">Поки що ніхто не додав слів. Зареєструйтесь і додайте перші!</p>
+            <h2 class="text-2xl font-extrabold text-white mb-2">{{ wordsStore.isTopicSource ? 'У топіку ще немає слів' : wordsStore.readOnly ? 'Загальний словник порожній' : 'Ваша колекція порожня' }}</h2>
+            <p v-if="wordsStore.isTopicSource" class="text-slate-400 text-sm max-w-xs">Викладач ще не додав слова в цей топік.</p>
+            <p v-else-if="wordsStore.readOnly" class="text-slate-400 text-sm max-w-xs">Поки що ніхто не додав слів. Зареєструйтесь і додайте перші!</p>
             <p v-else class="text-slate-400 text-sm max-w-xs mb-6">Додайте слова вручну, вставте список текстом або завантажте CSV-файл.</p>
             <div v-if="!wordsStore.readOnly" class="flex flex-col gap-2 w-full">
                 <button @click="openFilePicker()" class="w-full py-3 rounded-2xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-bold text-sm transition-all flex items-center justify-center gap-2">

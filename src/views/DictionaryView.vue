@@ -17,6 +17,9 @@ const openFilePicker = inject('openFilePicker');
                 <p v-if="wordsStore.canModerate" class="text-xs text-amber-300 w-full sm:w-auto text-center sm:text-right">
                     <i class="fa-solid fa-shield-halved mr-1"></i>Загальний словник · модерація: видалення прибирає слово в усіх користувачів
                 </p>
+                <p v-else-if="wordsStore.isTopicSource" class="text-xs text-violet-300 w-full sm:w-auto text-center sm:text-right">
+                    <i class="fa-solid fa-star mr-1"></i>Сподобалось слово? Додайте його у свій словник
+                </p>
                 <p v-else-if="wordsStore.readOnly" class="text-xs text-slate-400 w-full sm:w-auto text-center sm:text-right">
                     <i class="fa-solid fa-globe text-sky-400 mr-1"></i>Загальний словник · лише перегляд
                 </p>
@@ -54,6 +57,10 @@ const openFilePicker = inject('openFilePicker');
                 <button v-else-if="wordsStore.canModerate" @click="wordsStore.adminDeleteWord(item)" title="Видалити в усіх користувачів"
                         class="text-amber-400/80 hover:text-rose-400 text-xs p-1.5 rounded-lg hover:bg-slate-800 transition-all">
                     <i class="fa-solid fa-trash"></i>
+                </button>
+                <button v-else-if="wordsStore.isTopicSource" @click="wordsStore.copyToMine(item)" title="Додати у мій словник"
+                        class="text-violet-300/80 hover:text-amber-300 text-xs p-1.5 rounded-lg hover:bg-slate-800 transition-all">
+                    <i class="fa-solid fa-star"></i>
                 </button>
             </template>
         </WordList>

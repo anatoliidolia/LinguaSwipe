@@ -3,15 +3,18 @@ import { computed, ref } from 'vue';
 import { useUiStore } from '../stores/ui.js';
 import { useWordsStore } from '../stores/words.js';
 import { useStudentsStore } from '../stores/students.js';
+import { useTopicsStore } from '../stores/topics.js';
 
 const ui = useUiStore();
 const wordsStore = useWordsStore();
 const studentsStore = useStudentsStore();
+const topicsStore = useTopicsStore();
 const bulkText = ref('');
 
-// Свій словник або словник студента: обидва стори мають однаковий importText(text, label)
+// Свій словник, словник студента або топік: усі три стори мають однаковий importText(text, label)
 const forStudent = computed(() => ui.modalTarget === 'student' && studentsStore.student);
-const target = computed(() => forStudent.value ? studentsStore : wordsStore);
+const forTopic = computed(() => ui.modalTarget === 'topic' && topicsStore.topic);
+const target = computed(() => forStudent.value ? studentsStore : forTopic.value ? topicsStore : wordsStore);
 
 async function processBulkImport() {
     if (!bulkText.value.trim()) return;
@@ -37,11 +40,14 @@ async function processBulkImport() {
             <p v-if="forStudent" class="text-xs text-amber-300 mb-2">
                 <i class="fa-solid fa-user-graduate mr-1"></i>Словник студента: {{ studentsStore.student.email }}
             </p>
+            <p v-else-if="forTopic" class="text-xs text-violet-300 mb-2">
+                <i class="fa-solid fa-layer-group mr-1"></i>Топік: {{ topicsStore.topic.title }}
+            </p>
 
             <p class="text-xs text-slate-400 mb-4">
                 Вставте список слів у форматі: <code class="text-sky-300 font-mono">Слово, Переклад</code> або <code class="text-sky-300 font-mono">Слово - Переклад</code>.
                 Транскрипцію можна додати другою колонкою в квадратних дужках: <code class="text-sky-300 font-mono">Слово, [транскрипція], Переклад</code>.
-                Слова, які вже є у {{ forStudent ? 'словнику студента' : 'вашій колекції' }}, буде пропущено.
+                Слова, які вже є {{ forStudent ? 'у словнику студента' : forTopic ? 'в топіку' : 'у вашій колекції' }}, буде пропущено.
             </p>
 
             <textarea

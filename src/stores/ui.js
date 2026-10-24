@@ -9,7 +9,8 @@ export const useUiStore = defineStore('ui', () => {
     const singleModalOpen = ref(false);
     const bulkModalOpen = ref(false);
     const formWord = ref({ id: '', word: '', transcription: '', translation: '' });
-    // Чий словник змінюють модалки: 'own' — свій, 'student' — відкритий у вкладці «Користувачі»
+    // Чий словник змінюють модалки: 'own' — свій, 'student' — відкритий у вкладці «Користувачі»,
+    // 'topic' — топік, відкритий у вкладці «Топіки»
     const modalTarget = ref('own');
 
     const anyModalOpen = () => singleModalOpen.value || bulkModalOpen.value;

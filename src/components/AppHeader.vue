@@ -10,11 +10,14 @@ const wordsStore = useWordsStore();
 const openFilePicker = inject('openFilePicker');
 
 const tabs = computed(() => [
-    { id: 'practice', icon: 'fa-cards-blank', label: 'Тренування' },
+    { id: 'practice', icon: 'fa-clone', label: 'Тренування' },
     { id: 'dictionary', icon: 'fa-book', label: 'Словник', showCount: true },
     { id: 'stats', icon: 'fa-chart-line', label: 'SRS Прогрес' },
     // Адмінка: список користувачів і словники студентів
-    ...(auth.canManageUsers ? [{ id: 'users', icon: 'fa-users', label: auth.isAdmin ? 'Користувачі' : 'Студенти' }] : [])
+    ...(auth.canManageUsers ? [
+        { id: 'users', icon: 'fa-users', label: auth.isAdmin ? 'Користувачі' : 'Студенти' },
+        { id: 'topics', icon: 'fa-layer-group', label: 'Топіки' }
+    ] : [])
 ]);
 </script>
 
