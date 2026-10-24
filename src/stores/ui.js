@@ -9,20 +9,25 @@ export const useUiStore = defineStore('ui', () => {
     const singleModalOpen = ref(false);
     const bulkModalOpen = ref(false);
     const formWord = ref({ id: '', word: '', transcription: '', translation: '' });
+    // Чий словник змінюють модалки: 'own' — свій, 'student' — відкритий у вкладці «Користувачі»
+    const modalTarget = ref('own');
 
     const anyModalOpen = () => singleModalOpen.value || bulkModalOpen.value;
 
-    function openAddModal() {
+    function openAddModal(target = 'own') {
+        modalTarget.value = target;
         formWord.value = { id: '', word: '', transcription: '', translation: '' };
         singleModalOpen.value = true;
     }
 
-    function editWord(item) {
+    function editWord(item, target = 'own') {
+        modalTarget.value = target;
         formWord.value = { ...item, transcription: item.transcription || '' };
         singleModalOpen.value = true;
     }
 
-    function openBulkModal() {
+    function openBulkModal(target = 'own') {
+        modalTarget.value = target;
         bulkModalOpen.value = true;
     }
 
@@ -38,6 +43,7 @@ export const useUiStore = defineStore('ui', () => {
         singleModalOpen,
         bulkModalOpen,
         formWord,
+        modalTarget,
         anyModalOpen,
         openAddModal,
         editWord,
