@@ -6,7 +6,10 @@ export const STORAGE_KEYS = {
     guest: 'linguaswipe_guest',
     guestProgress: 'linguaswipe_guest_progress',
     // Окремий ключ: старі версії сайту читають guestProgress як { слово: box } і мають і далі його розуміти
-    guestSchedule: 'linguaswipe_guest_schedule'
+    guestSchedule: 'linguaswipe_guest_schedule',
+    // { слово: { box, due } } — прогрес гостя у зворотному напрямку (UA → EN)
+    guestReverse: 'linguaswipe_guest_reverse',
+    practiceMode: 'linguaswipe_practice_mode'
 };
 
 export function readStored(key) {
@@ -35,4 +38,12 @@ export function readGuestSchedule() {
 
 export function writeGuestSchedule(schedule) {
     writeStored(STORAGE_KEYS.guestSchedule, JSON.stringify(schedule));
+}
+
+export function readGuestReverse() {
+    try { return JSON.parse(readStored(STORAGE_KEYS.guestReverse) || '{}'); } catch (e) { return {}; }
+}
+
+export function writeGuestReverse(progress) {
+    writeStored(STORAGE_KEYS.guestReverse, JSON.stringify(progress));
 }

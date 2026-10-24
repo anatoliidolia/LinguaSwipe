@@ -1,6 +1,6 @@
 <script setup>
 import { computed, inject, onMounted, onUnmounted } from 'vue';
-import { formatDaysFromNow, pluralWords } from '../lib/srs.js';
+import { formatDaysFromNow, pluralWords, PRACTICE_MODES } from '../lib/srs.js';
 import { usePracticeStore } from '../stores/practice.js';
 import { useUiStore } from '../stores/ui.js';
 import { useWordsStore } from '../stores/words.js';
@@ -13,10 +13,13 @@ const openFilePicker = inject('openFilePicker');
 
 // «Наступне повторення: завтра · 5 слів»
 const nextReviewText = computed(() => {
-    const next = wordsStore.nextReview;
+    const next = practice.nextReview;
     if (!next) return '';
     return `${formatDaysFromNow(next.days)} · ${pluralWords(next.count)}`;
 });
+
+// Скільки карток буде в «Повторити наперед»: у режимі «Обидва» кожне слово двічі
+const aheadCount = computed(() => wordsStore.words.length * PRACTICE_MODES[practice.effectiveMode].directions.length);
 
 // Гарячі клавіші працюють, лише поки відкрита вкладка тренування і немає модальних вікон
 function handleKeydown(e) {
@@ -41,6 +44,16 @@ onUnmounted(() => window.removeEventListener('keydown', handleKeydown));
 <template>
     <!-- PRACTICE DECK (TINDER SWIPE + 3D FLIP CARD) -->
     <div class="w-full flex-1 flex flex-col items-center justify-between max-w-md my-auto py-2">
+
+        <!-- Напрямок тренування (з'являється після міграції 005) -->
+        <div v-if="wordsStore.hasReverse && wordsStore.words.length > 0" class="flex bg-slate-800/60 p-1 rounded-xl border border-slate-700/50 text-xs mb-3">
+            <button v-for="(item, key) in PRACTICE_MODES" :key="key"
+                    @click="practice.setMode(key)"
+                    :class="practice.effectiveMode === key ? 'bg-sky-500 text-white shadow-md' : 'text-slate-400 hover:text-white'"
+                    class="px-3 py-1 rounded-lg font-semibold transition-all">
+                {{ item.label }}
+            </button>
+        </div>
 
         <!-- Top Session Indicator & Progress -->
         <div class="w-full mb-3 flex items-center justify-between text-xs text-slate-400 px-1">
@@ -69,10 +82,10 @@ onUnmounted(() => window.removeEventListener('keydown', handleKeydown));
 
             <!-- Background Card Preview (Stack effect) -->
             <div
-                    v-if="practice.nextCard"
+                    v-if="practice.nextCardText"
                     class="absolute inset-0 rounded-3xl bg-slate-900/90 border border-slate-700/40 p-8 shadow-2xl flex flex-col items-center justify-center opacity-40 scale-95 translate-y-4 pointer-events-none transition-all duration-300">
                 <span class="text-xs text-slate-500 font-mono mb-2">НАСТУПНЕ СЛОВО</span>
-                <h3 class="text-3xl font-black text-slate-300">{{ practice.nextCard.word }}</h3>
+                <h3 class="text-3xl font-black text-slate-300 text-center">{{ practice.nextCardText }}</h3>
             </div>
 
             <SwipeCard />
@@ -128,12 +141,20 @@ onUnmounted(() => window.removeEventListener('keydown', handleKeydown));
                 </div>
             </div>
 
+            <!-- Після основного напрямку — запропонувати зворотний: UA → EN -->
             <button
-                    v-if="wordsStore.dueCount > 0"
+                    v-if="practice.effectiveMode === 'forward' && practice.reverseDueCount > 0"
+                    @click="practice.setMode('reverse')"
+                    class="w-full py-3.5 px-6 mb-2 rounded-2xl bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-400 hover:to-indigo-500 text-white font-bold text-sm shadow-xl shadow-violet-500/25 transition-all flex items-center justify-center gap-2">
+                <i class="fa-solid fa-right-left"></i>
+                <span>Тепер навпаки: UA → EN ({{ practice.reverseDueCount }})</span>
+            </button>
+            <button
+                    v-if="practice.dueCount > 0"
                     @click="practice.startSession()"
                     class="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-bold text-sm shadow-xl shadow-sky-500/25 transition-all flex items-center justify-center gap-2">
                 <i class="fa-solid fa-rotate-right"></i>
-                <span>{{ wordsStore.hasSchedule ? `Повторити ще ${wordsStore.dueCount}` : 'Почати нову сесію' }}</span>
+                <span>{{ wordsStore.hasSchedule ? `Повторити ще ${practice.dueCount}` : 'Почати нову сесію' }}</span>
             </button>
             <button
                     v-else
@@ -141,7 +162,7 @@ onUnmounted(() => window.removeEventListener('keydown', handleKeydown));
                     title="«Знаю» не змінює розклад, «Не знаю» повертає слово на рівень 0"
                     class="w-full py-3 px-6 rounded-2xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-semibold text-sm transition-all flex items-center justify-center gap-2">
                 <i class="fa-solid fa-forward"></i>
-                <span>Повторити наперед ({{ wordsStore.words.length }})</span>
+                <span>Повторити наперед ({{ aheadCount }})</span>
             </button>
         </div>
 

@@ -14,6 +14,9 @@ const dragY = ref(0);
 const hasMoved = ref(false);
 
 const card = computed(() => practice.currentCard);
+const reverse = computed(() => practice.currentDir === 'reverse');
+// Рівень картки в її напрямку: у UA → EN свій прогрес (reverse_box)
+const box = computed(() => (reverse.value ? card.value.reverse_box : card.value.box) || 0);
 
 const knowOverlayOpacity = computed(() => dragX.value <= 0 ? 0 : Math.min(1, dragX.value / 100));
 const dontKnowOverlayOpacity = computed(() => dragX.value >= 0 ? 0 : Math.min(1, Math.abs(dragX.value) / 100));
@@ -104,19 +107,29 @@ function onPointerUp() {
                 class="w-full h-full transform-style-3d relative rounded-3xl"
                 :class="{ 'rotate-y-180': practice.isFlipped }">
 
-            <!-- FRONT SIDE: ENGLISH WORD -->
-            <div class="card-front-face absolute inset-0 w-full h-full rounded-3xl p-8 flex flex-col justify-between items-center backface-hidden bg-slate-900 border border-slate-700/80 shadow-2xl">
+            <!-- FRONT SIDE: EN → UA — англійське слово; UA → EN — переклад -->
+            <div class="card-front-face absolute inset-0 w-full h-full rounded-3xl p-8 flex flex-col justify-between items-center backface-hidden bg-slate-900 border shadow-2xl"
+                 :class="reverse ? 'border-violet-500/50' : 'border-slate-700/80'">
 
                 <div class="w-full flex justify-between items-center">
-                    <span class="text-[11px] uppercase tracking-widest font-bold text-sky-400 bg-sky-500/10 px-3 py-1 rounded-full border border-sky-500/20">
+                    <span v-if="reverse" class="text-[11px] uppercase tracking-widest font-bold text-violet-300 bg-violet-500/10 px-3 py-1 rounded-full border border-violet-500/20">
+                        УКРАЇНСЬКОЮ → EN
+                    </span>
+                    <span v-else class="text-[11px] uppercase tracking-widest font-bold text-sky-400 bg-sky-500/10 px-3 py-1 rounded-full border border-sky-500/20">
                         ENGLISH
                     </span>
                     <span class="text-xs text-slate-400 font-mono bg-slate-800 px-2.5 py-1 rounded-lg">
-                        SRS Box {{ card.box }}
+                        SRS Box {{ box }}
                     </span>
                 </div>
 
-                <div class="text-center my-auto px-2">
+                <div v-if="reverse" class="text-center my-auto px-2">
+                    <h2 class="text-3xl sm:text-4xl font-black text-white leading-snug">
+                        {{ card.translation }}
+                    </h2>
+                    <p class="mt-3 text-sm text-slate-500">Як це англійською?</p>
+                </div>
+                <div v-else class="text-center my-auto px-2">
                     <h2 class="text-4xl sm:text-5xl font-black text-white tracking-tight leading-tight">
                         {{ card.word }}
                     </h2>
@@ -124,24 +137,32 @@ function onPointerUp() {
                 </div>
 
                 <div class="text-center text-xs text-slate-400 flex items-center justify-center gap-2 font-medium bg-slate-800/80 px-4 py-2 rounded-xl border border-slate-700/50">
-                    <i class="fa-solid fa-hand-pointer text-sky-400 animate-bounce"></i>
-                    <span>Натисніть на картку, щоб показати переклад</span>
+                    <i class="fa-solid fa-hand-pointer animate-bounce" :class="reverse ? 'text-violet-300' : 'text-sky-400'"></i>
+                    <span>{{ reverse ? 'Згадайте слово і натисніть, щоб перевірити' : 'Натисніть на картку, щоб показати переклад' }}</span>
                 </div>
             </div>
 
-            <!-- BACK SIDE: UKRAINIAN TRANSLATION -->
+            <!-- BACK SIDE: EN → UA — переклад; UA → EN — англійське слово з транскрипцією -->
             <div class="card-back-face absolute inset-0 w-full h-full rounded-3xl p-8 flex flex-col justify-between items-center backface-hidden bg-slate-900 border-2 border-emerald-500/50 shadow-2xl">
 
                 <div class="w-full flex justify-between items-center border-b border-slate-800 pb-3">
                     <span class="text-[11px] uppercase tracking-widest font-bold text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
-                        ПЕРЕКЛАД (УКР)
+                        {{ reverse ? 'ENGLISH' : 'ПЕРЕКЛАД (УКР)' }}
                     </span>
                     <span class="text-xs text-slate-400 font-mono bg-slate-800 px-2.5 py-1 rounded-lg">
-                        SRS Box {{ card.box }}
+                        SRS Box {{ box }}
                     </span>
                 </div>
 
-                <div class="text-center my-auto px-2">
+                <div v-if="reverse" class="text-center my-auto px-2">
+                    <p class="text-sm text-slate-500 mb-3">{{ card.translation }}</p>
+                    <span class="text-xs text-slate-500 uppercase font-semibold tracking-widest block mb-3">Англійською:</span>
+                    <h3 class="text-4xl sm:text-5xl font-black text-emerald-400 tracking-tight leading-tight">
+                        {{ card.word }}
+                    </h3>
+                    <p v-if="card.transcription" class="mt-3 text-lg text-slate-400 font-medium">[{{ card.transcription }}]</p>
+                </div>
+                <div v-else class="text-center my-auto px-2">
                     <p v-if="card.transcription" class="text-sm text-slate-500 mb-3">{{ card.word }} [{{ card.transcription }}]</p>
                     <span class="text-xs text-slate-500 uppercase font-semibold tracking-widest block mb-3">Українською:</span>
                     <h3 class="text-3xl sm:text-4xl font-black text-emerald-400 leading-snug">

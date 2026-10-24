@@ -2,9 +2,9 @@ import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
 import { sb, check, fetchAllRows, isMissingColumn, WORD_COLUMNS } from '../lib/supabase.js';
 import {
-    readStored, writeStored, readGuestProgress, writeGuestProgress, readGuestSchedule, writeGuestSchedule, STORAGE_KEYS
+    readStored, writeStored, readGuestProgress, writeGuestProgress, readGuestSchedule, writeGuestSchedule,
+    readGuestReverse, writeGuestReverse, STORAGE_KEYS
 } from '../lib/storage.js';
-import { isDue, daysUntil } from '../lib/srs.js';
 import { parseCSVContent } from '../lib/csv.js';
 import { prepareFormWord, prepareImport, hasWord, importSummary, emptyImportMessage } from '../lib/wordEditing.js';
 import { useAuthStore } from './auth.js';
@@ -22,77 +22,69 @@ export const useWordsStore = defineStore('words', () => {
     const readOnly = computed(() => auth.isGuest || wordSource.value === 'all');
     const canModerate = computed(() => auth.isAdmin && !auth.isGuest && wordSource.value === 'all');
 
-    // Колонку due_at додає migrations/004_review_schedule.sql. Поки її немає в базі,
-    // слова показуються щоразу всі, як до появи розкладу, а дата повторення не зберігається.
+    // Колонку due_at додає migrations/004_review_schedule.sql, reverse_* — 005_reverse_direction.sql.
+    // Поки міграції немає, працюємо без відповідної функції: без розкладу слова показуються щоразу всі,
+    // без reverse_* немає режиму UA → EN.
     const hasSchedule = ref(true);
+    const hasReverse = ref(true);
 
-    const dueCount = computed(() => words.value.filter(w => isDue(w)).length);
-
-    // Найближчий день, коли з'являться нові слова для повторення, і скільки їх буде
-    const nextReview = computed(() => {
-        let days = Infinity;
-        let count = 0;
-        words.value.forEach(w => {
-            if (isDue(w)) return;
-            const d = daysUntil(w.due_at);
-            if (d < days) { days = d; count = 1; } else if (d === days) count++;
-        });
-        return count ? { days, count } : null;
-    });
-
-    // Скільки слів чекає на повторення: сьогодні, завтра і протягом тижня
-    const forecast = computed(() => {
-        const result = { today: 0, tomorrow: 0, week: 0 };
-        words.value.forEach(w => {
-            const d = isDue(w) ? 0 : daysUntil(w.due_at);
-            if (d <= 0) result.today++;
-            else if (d === 1) result.tomorrow++;
-            if (d <= 7) result.week++;
-        });
-        return result;
-    });
-
-    // Запит із due_at, а якщо міграції ще немає — той самий запит без неї
-    async function fetchWithSchedule(makeQuery) {
-        try {
-            const rows = await fetchAllRows(() => makeQuery(true));
-            hasSchedule.value = true;
-            return rows;
-        } catch (err) {
-            if (!isMissingColumn(err)) throw err;
-            hasSchedule.value = false;
-            return fetchAllRows(() => makeQuery(false));
+    // Запит із новими колонками, а якщо якоїсь міграції ще немає — з тими колонками, що є.
+    // levels: від найповнішого набору до базового; makeQuery(level) будує запит для рівня.
+    const SCHEMA_LEVELS = ['reverse', 'schedule', 'base'];
+    async function fetchWithFallback(makeQuery) {
+        for (const level of SCHEMA_LEVELS) {
+            try {
+                const rows = await fetchAllRows(() => makeQuery(level));
+                hasReverse.value = level === 'reverse';
+                hasSchedule.value = level !== 'base';
+                return rows;
+            } catch (err) {
+                if (!isMissingColumn(err) || level === 'base') throw err;
+            }
         }
     }
+
+    const PROGRESS_COLUMNS = {
+        reverse: ', due_at, reverse_box, reverse_due_at',
+        schedule: ', due_at',
+        base: ''
+    };
 
     // Shared dictionary: words of all users (deduplicated), progress kept separately
     async function loadSharedWords() {
         const shared = await fetchAllRows(() => sb.rpc('public_words'));
         let progress = {};
         let schedule = {};
+        let reverse = {};
         if (auth.isGuest) {
             progress = readGuestProgress();
             schedule = readGuestSchedule();
+            reverse = readGuestReverse();
+            hasSchedule.value = true;
+            hasReverse.value = true;
         } else {
-            const rows = await fetchWithSchedule(withDue =>
-                sb.from('word_progress').select(withDue ? 'word_key, box, due_at' : 'word_key, box'));
+            const rows = await fetchWithFallback(level =>
+                sb.from('word_progress').select('word_key, box' + PROGRESS_COLUMNS[level]));
             rows.forEach(r => {
                 progress[r.word_key] = r.box;
                 if (r.due_at) schedule[r.word_key] = r.due_at;
+                if (r.reverse_box || r.reverse_due_at) reverse[r.word_key] = { box: r.reverse_box || 0, due: r.reverse_due_at || null };
             });
         }
         return shared.map((w, i) => {
             const key = w.word.toLowerCase();
+            const rev = reverse[key] || {};
             return {
                 id: `shared-${i}`, key, word: w.word, transcription: w.transcription, translation: w.translation,
-                box: progress[key] || 0, due_at: schedule[key] || null
+                box: progress[key] || 0, due_at: schedule[key] || null,
+                reverse_box: rev.box || 0, reverse_due_at: rev.due || null
             };
         });
     }
 
     function loadOwnWords() {
-        return fetchWithSchedule(withDue => sb.from('words')
-            .select(withDue ? WORD_COLUMNS + ', due_at' : WORD_COLUMNS)
+        return fetchWithFallback(level => sb.from('words')
+            .select(WORD_COLUMNS + PROGRESS_COLUMNS[level])
             .order('id', { ascending: false }));
     }
 
@@ -119,24 +111,40 @@ export const useWordsStore = defineStore('words', () => {
         loadWords();
     }
 
-    // Зберігає рівень і дату наступного повторення
-    async function persistWord(card) {
-        const schedule = hasSchedule.value ? { due_at: card.due_at } : {};
+    // Поля прогресу напрямку для запису в базу (лише ті колонки, що вже є)
+    function progressFields(card, dir) {
+        if (dir === 'reverse') return { reverse_box: card.reverse_box || 0, reverse_due_at: card.reverse_due_at || null };
+        return hasSchedule.value ? { box: card.box, due_at: card.due_at || null } : { box: card.box };
+    }
+
+    function persistGuest(card, dir) {
+        if (dir === 'reverse') {
+            const reverse = readGuestReverse();
+            reverse[card.key] = { box: card.reverse_box || 0, due: card.reverse_due_at || null };
+            writeGuestReverse(reverse);
+            return;
+        }
+        const progress = readGuestProgress();
+        progress[card.key] = card.box;
+        writeGuestProgress(progress);
+        const guestSchedule = readGuestSchedule();
+        if (card.due_at) guestSchedule[card.key] = card.due_at;
+        else delete guestSchedule[card.key];
+        writeGuestSchedule(guestSchedule);
+    }
+
+    // Зберігає рівень і дату наступного повторення для напрямку dir ('forward' | 'reverse')
+    async function persistWord(card, dir = 'forward') {
         try {
             if (auth.isGuest) {
-                const progress = readGuestProgress();
-                progress[card.key] = card.box;
-                writeGuestProgress(progress);
-                const guestSchedule = readGuestSchedule();
-                if (card.due_at) guestSchedule[card.key] = card.due_at;
-                else delete guestSchedule[card.key];
-                writeGuestSchedule(guestSchedule);
+                persistGuest(card, dir);
             } else if (card.key) {
+                // Upsert оновлює лише передані колонки: прогрес іншого напрямку не зачіпається
                 check(await sb.from('word_progress').upsert(
-                    { user_id: auth.user.id, word_key: card.key, box: card.box, ...schedule },
+                    { user_id: auth.user.id, word_key: card.key, ...progressFields(card, dir) },
                     { onConflict: 'user_id,word_key' }));
             } else {
-                check(await sb.from('words').update({ box: card.box, ...schedule }).eq('id', card.id));
+                check(await sb.from('words').update(progressFields(card, dir)).eq('id', card.id));
             }
         } catch (err) {
             ui.statusMessage = 'Не вдалося зберегти прогрес: ' + err.message;
@@ -242,9 +250,7 @@ export const useWordsStore = defineStore('words', () => {
         readOnly,
         canModerate,
         hasSchedule,
-        dueCount,
-        nextReview,
-        forecast,
+        hasReverse,
         loadWords,
         setWordSource,
         persistWord,

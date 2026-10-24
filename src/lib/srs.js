@@ -50,16 +50,68 @@ function endOfToday(now = new Date()) {
     return end;
 }
 
+// ===== Напрямки тренування =====
+// forward: EN → UA (на картці англійське слово) — поля box / due_at;
+// reverse: UA → EN (на картці переклад) — окремий прогрес reverse_box / reverse_due_at
+// (migrations/005_reverse_direction.sql).
+export const DIRECTIONS = {
+    forward: { label: 'EN → UA', boxField: 'box', dueField: 'due_at' },
+    reverse: { label: 'UA → EN', boxField: 'reverse_box', dueField: 'reverse_due_at' }
+};
+
+// Режим тренування → напрямки карток: 'both' дає кожне слово в обох напрямках
+export const PRACTICE_MODES = {
+    forward: { label: 'EN → UA', directions: ['forward'] },
+    reverse: { label: 'UA → EN', directions: ['reverse'] },
+    both: { label: 'Обидва', directions: ['forward', 'reverse'] }
+};
+
+export function progressOf(word, dir = 'forward') {
+    const { boxField, dueField } = DIRECTIONS[dir];
+    return { box: word[boxField] || 0, due_at: word[dueField] || null };
+}
+
+export function setProgress(word, dir, box, dueAt) {
+    const { boxField, dueField } = DIRECTIONS[dir];
+    word[boxField] = box;
+    word[dueField] = dueAt;
+}
+
 // Слово пора повторити, якщо його дата — сьогодні або раніше (за місцевим часом).
 // Тож слово «на завтра» з'явиться зранку, а не лише о тій самій годині, коли його вчили.
-export function isDue(word, now = new Date()) {
-    return !word.due_at || new Date(word.due_at) <= endOfToday(now);
+export function isDue(word, dir = 'forward', now = new Date()) {
+    const { due_at } = progressOf(word, dir);
+    return !due_at || new Date(due_at) <= endOfToday(now);
 }
 
 // Кількість календарних днів від сьогодні до дати: 0 — сьогодні, 1 — завтра
 export function daysUntil(date, now = new Date()) {
     const start = d => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
     return Math.round((start(new Date(date)) - start(now)) / DAY_MS);
+}
+
+// Найближчий день, коли з'являться нові картки для повторення, і скільки їх буде
+export function nextReview(words, directions) {
+    let days = Infinity;
+    let count = 0;
+    words.forEach(w => directions.forEach(dir => {
+        if (isDue(w, dir)) return;
+        const d = daysUntil(progressOf(w, dir).due_at);
+        if (d < days) { days = d; count = 1; } else if (d === days) count++;
+    }));
+    return count ? { days, count } : null;
+}
+
+// Скільки карток чекає на повторення: сьогодні, завтра і протягом тижня
+export function forecast(words, directions) {
+    const result = { today: 0, tomorrow: 0, week: 0 };
+    words.forEach(w => directions.forEach(dir => {
+        const d = isDue(w, dir) ? 0 : daysUntil(progressOf(w, dir).due_at);
+        if (d <= 0) result.today++;
+        else if (d === 1) result.tomorrow++;
+        if (d <= 7) result.week++;
+    }));
+    return result;
 }
 
 export function formatDaysFromNow(days) {

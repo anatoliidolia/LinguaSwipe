@@ -1,16 +1,25 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useWordsStore } from '../stores/words.js';
-import { LEITNER_BOXES } from '../lib/srs.js';
+import { usePracticeStore } from '../stores/practice.js';
+import { LEITNER_BOXES, DIRECTIONS, forecast, progressOf } from '../lib/srs.js';
 
 const wordsStore = useWordsStore();
+const practice = usePracticeStore();
 
-const boxCounts = computed(() => LEITNER_BOXES.map((_, box) => wordsStore.words.filter(w => w.box === box).length));
-const forecastItems = computed(() => [
-    { label: 'Повторити сьогодні', value: wordsStore.forecast.today, color: 'text-sky-400' },
-    { label: 'Завтра', value: wordsStore.forecast.tomorrow, color: 'text-amber-400' },
-    { label: 'За 7 днів', value: wordsStore.forecast.week, color: 'text-emerald-400' }
-]);
+// Статистика окремо для кожного напрямку: у UA → EN свій прогрес
+const direction = ref(practice.effectiveMode === 'reverse' ? 'reverse' : 'forward');
+const dir = computed(() => wordsStore.hasReverse ? direction.value : 'forward');
+
+const boxCounts = computed(() => LEITNER_BOXES.map((_, box) => wordsStore.words.filter(w => progressOf(w, dir.value).box === box).length));
+const forecastItems = computed(() => {
+    const f = forecast(wordsStore.words, [dir.value]);
+    return [
+        { label: 'Повторити сьогодні', value: f.today, color: 'text-sky-400' },
+        { label: 'Завтра', value: f.tomorrow, color: 'text-amber-400' },
+        { label: 'За 7 днів', value: f.week, color: 'text-emerald-400' }
+    ];
+});
 const boxPercent = box => wordsStore.words.length ? (boxCounts.value[box] / wordsStore.words.length * 100) + '%' : '0%';
 </script>
 
@@ -26,6 +35,15 @@ const boxPercent = box => wordsStore.words.length ? (boxCounts.value[box] / word
             <p class="text-xs text-slate-400 leading-relaxed">
                 Кожне успішне «Знаю» переміщує слово у вищий Box і відкладає його на довший інтервал: слово зникає з тренувань і повертається, коли настане час повторення. Якщо слово свайпнути «Не знаю» — воно повертається в Box 0 і повторюється в цій же сесії.
             </p>
+        </div>
+
+        <div v-if="wordsStore.hasReverse" class="flex self-center bg-slate-800/60 p-1 rounded-xl border border-slate-700/50 text-xs mb-4">
+            <button v-for="(item, key) in DIRECTIONS" :key="key"
+                    @click="direction = key"
+                    :class="dir === key ? 'bg-sky-500 text-white shadow-md' : 'text-slate-400 hover:text-white'"
+                    class="px-3 py-1 rounded-lg font-semibold transition-all">
+                {{ item.label }}
+            </button>
         </div>
 
         <!-- Прогноз повторень -->
