@@ -22,9 +22,10 @@ LinguaSwipe — PWA для вивчення англійських слів (с�
 - Нові `check`-обмеження на наявних таблицях додавай з `not valid`, щоб старі рядки не зламали міграцію.
 - Нові таблиці — одразу з `enable row level security` і політиками `(select auth.uid()) = user_id`; `revoke all … from anon`, якщо гостям доступ не потрібен.
 - Функції `security definer` — завжди з `set search_path = ''`, `revoke all … from public`, а потім `grant execute` лише потрібним ролям.
-- **Зворотна сумісність:** старі версії сайту (закешовані через service worker) і розширення Chrome продовжують працювати після міграції. Не перейменовуй і не видаляй колонки, таблиці, RPC-функції (`public_words`, `is_admin`, `admin_delete_word`) і не змінюй їхні аргументи. Додавай нове поруч.
+- **Зворотна сумісність:** старі версії сайту (закешовані через service worker) і розширення Chrome продовжують працювати після міграції. Не перейменовуй і не видаляй колонки, таблиці, RPC-функції (`public_words`, `is_admin`, `admin_delete_word`, `my_role`, `can_manage_user`, `list_users`, `set_student`, `set_teacher`, `student_words`, `student_add_words`, `student_update_word`, `student_delete_word`) і не змінюй їхні аргументи. Додавай нове поруч.
 - Міграцію виконує користувач вручну в Supabase → SQL Editor **до** деплою коду, що на неї спирається. Нагадуй про це. Сам SQL на продакшен не запускай.
-- Код має переживати ситуацію, коли міграцію ще не виконано (див. `loadAdminFlag` в `src/stores/auth.js`: помилка RPC означає просто «немає прав»).
+- Код має переживати ситуацію, коли міграцію ще не виконано (див. `loadRole` в `src/stores/auth.js`: помилка RPC означає просто «немає прав»).
+- **Ролі** (`migrations/003_teachers.sql`): студент — лише свій словник; викладач — ще й словники своїх студентів (`teacher_students`); адмін (`admins`) — усе. **Не розширюй RLS таблиці `words` для викладачів:** запит «мої слова» на сайті і в розширенні не фільтрує за `user_id` і покладається на RLS, тож викладач побачив би чужі слова як свої. Доступ до чужих словників — лише через `security definer` функції з перевіркою `can_manage_user()`.
 
 ## 3. Екранування і захист від XSS / ін'єкцій
 
@@ -62,9 +63,9 @@ src/
     storage.js             безпечний localStorage + ключі
     srs.js                 рівні Лейтнера
     pwa.js                 service worker, банер встановлення
-  stores/                  Pinia: auth, words, practice (сесія), ui (вкладка, модалки)
+  stores/                  Pinia: auth (роль), words, practice (сесія), students (адмінка), ui (вкладка, модалки)
   components/              AppHeader, AuthScreen, SwipeCard, модалки…
-  views/                   PracticeView, DictionaryView, StatsView (вкладки)
+  views/                   PracticeView, DictionaryView, StatsView, UsersView (вкладки)
 public/                    manifest.json, sw.js, icons/ (копіюються як є)
 migrations/                зміни схеми БД (див. розділ 2)
 chrome-extension/          розширення Chrome (Manifest V3, без збірки)

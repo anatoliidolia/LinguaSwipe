@@ -1,12 +1,19 @@
 <script setup>
+import { computed } from 'vue';
 import { useUiStore } from '../stores/ui.js';
 import { useWordsStore } from '../stores/words.js';
+import { useStudentsStore } from '../stores/students.js';
 
 const ui = useUiStore();
 const wordsStore = useWordsStore();
+const studentsStore = useStudentsStore();
+
+// Свій словник або словник студента: обидва стори мають однаковий saveWord(form)
+const forStudent = computed(() => ui.modalTarget === 'student' && studentsStore.student);
+const target = computed(() => forStudent.value ? studentsStore : wordsStore);
 
 async function save() {
-    if (await wordsStore.saveWord(ui.formWord)) ui.singleModalOpen = false;
+    if (await target.value.saveWord(ui.formWord)) ui.singleModalOpen = false;
 }
 </script>
 
@@ -25,6 +32,9 @@ async function save() {
                 <i class="fa-solid fa-plus-circle text-sky-400"></i>
                 {{ ui.formWord.id ? 'Редагувати слово' : 'Додати нове слово' }}
             </h3>
+            <p v-if="forStudent" class="text-xs text-amber-300 -mt-2 mb-4">
+                <i class="fa-solid fa-user-graduate mr-1"></i>Словник студента: {{ studentsStore.student.email }}
+            </p>
 
             <form @submit.prevent="save" class="space-y-4">
                 <div>

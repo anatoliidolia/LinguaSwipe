@@ -1,8 +1,9 @@
 <script setup>
-import { onMounted, provide, ref } from 'vue';
+import { onMounted, provide, ref, watch } from 'vue';
 import { useAuthStore } from './stores/auth.js';
 import { useUiStore } from './stores/ui.js';
 import { useWordsStore } from './stores/words.js';
+import { useStudentsStore } from './stores/students.js';
 import InstallBanner from './components/InstallBanner.vue';
 import AuthScreen from './components/AuthScreen.vue';
 import AppHeader from './components/AppHeader.vue';
@@ -13,22 +14,35 @@ import BulkImportModal from './components/BulkImportModal.vue';
 import PracticeView from './views/PracticeView.vue';
 import DictionaryView from './views/DictionaryView.vue';
 import StatsView from './views/StatsView.vue';
+import UsersView from './views/UsersView.vue';
 
 const auth = useAuthStore();
 const ui = useUiStore();
 const wordsStore = useWordsStore();
+const studentsStore = useStudentsStore();
 
 // Hidden file input for importing words into the user's collection.
-// Кнопки імпорту в різних компонентах відкривають його через inject('openFilePicker').
+// Кнопки імпорту в різних компонентах відкривають його через inject('openFilePicker'):
+// openFilePicker() — у свій словник, openFilePicker('student') — у словник відкритого студента.
 const fileInputRef = ref(null);
-provide('openFilePicker', () => fileInputRef.value && fileInputRef.value.click());
+let fileTarget = 'own';
+provide('openFilePicker', (target = 'own') => {
+    fileTarget = target;
+    if (fileInputRef.value) fileInputRef.value.click();
+});
 
 async function onFileSelected(e) {
     const file = e.target.files && e.target.files[0];
     e.target.value = '';
     if (!file) return;
-    await wordsStore.importText(await file.text(), `Файл «${file.name}»`);
+    const target = fileTarget === 'student' && studentsStore.student ? studentsStore : wordsStore;
+    await target.importText(await file.text(), `Файл «${file.name}»`);
 }
+
+// Роль могли забрати (перемикання словника перечитує її) — не лишати користувача на закритій вкладці
+watch(() => auth.canManageUsers, can => {
+    if (!can && ui.currentTab === 'users') ui.currentTab = 'practice';
+});
 
 onMounted(() => auth.init());
 </script>
@@ -48,12 +62,13 @@ onMounted(() => auth.init());
     <template v-else>
         <AppHeader />
         <StatusBanner />
-        <WordSourceSwitch />
+        <WordSourceSwitch v-if="ui.currentTab !== 'users'" />
 
         <main class="flex-1 max-w-4xl w-full mx-auto p-4 flex flex-col justify-center items-center">
             <PracticeView v-if="ui.currentTab === 'practice'" />
             <DictionaryView v-else-if="ui.currentTab === 'dictionary'" />
             <StatsView v-else-if="ui.currentTab === 'stats'" />
+            <UsersView v-else-if="ui.currentTab === 'users' && auth.canManageUsers" />
         </main>
 
         <WordFormModal v-if="ui.singleModalOpen" />

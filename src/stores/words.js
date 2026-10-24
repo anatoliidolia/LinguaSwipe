@@ -2,8 +2,8 @@ import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
 import { sb, check, fetchAllRows, WORD_COLUMNS } from '../lib/supabase.js';
 import { readStored, writeStored, readGuestProgress, writeGuestProgress, STORAGE_KEYS } from '../lib/storage.js';
-import { normalizeTranscription, validateWord, MAX_WORD_LENGTH, MAX_TRANSLATION_LENGTH } from '../lib/validation.js';
 import { parseCSVContent } from '../lib/csv.js';
+import { prepareFormWord, prepareImport, hasWord, importSummary, emptyImportMessage } from '../lib/wordEditing.js';
 import { useAuthStore } from './auth.js';
 import { useUiStore } from './ui.js';
 import { usePracticeStore } from './practice.js';
@@ -38,7 +38,7 @@ export const useWordsStore = defineStore('words', () => {
     let loadCounter = 0;
     async function loadWords() {
         const loadId = ++loadCounter;
-        auth.loadAdminFlag();
+        auth.loadRole();
         let loaded = [];
         try {
             loaded = readOnly.value
@@ -86,30 +86,20 @@ export const useWordsStore = defineStore('words', () => {
     }
 
     // ADD MANY WORDS TO THE USER'S COLLECTION (skips words already in it)
-    async function importItems(items, sourceLabel) {
+    async function importText(text, sourceLabel) {
+        const items = parseCSVContent(text);
         if (items.length === 0) {
-            ui.statusMessage = `${sourceLabel}: не знайдено жодного рядка у форматі «слово, переклад».`;
+            ui.statusMessage = emptyImportMessage(sourceLabel);
             return false;
         }
-        const seen = new Set(words.value.map(w => w.word.toLowerCase()));
-        const fresh = [];
-        items.forEach(({ word, transcription, translation }) => {
-            const w = word.trim().slice(0, MAX_WORD_LENGTH);
-            const tr = normalizeTranscription(transcription);
-            const t = translation.trim().slice(0, MAX_TRANSLATION_LENGTH);
-            if (validateWord(w, t, tr) || seen.has(w.toLowerCase())) return;
-            seen.add(w.toLowerCase());
-            fresh.push({ word: w, transcription: tr || null, translation: t });
-        });
-        const skipped = items.length - fresh.length;
+        const fresh = prepareImport(items, words.value);
 
         try {
             const added = fresh.length
                 ? check(await sb.from('words').insert(fresh).select(WORD_COLUMNS))
                 : [];
             added.forEach(addToCollection);
-            ui.statusMessage = `${sourceLabel}: додано ${added.length} слів` +
-                (skipped ? `, пропущено ${skipped} (дублікати, порожні або з недозволеними символами)` : '');
+            ui.statusMessage = importSummary(sourceLabel, added.length, items.length - fresh.length);
             return true;
         } catch (err) {
             ui.statusMessage = err.message;
@@ -117,38 +107,32 @@ export const useWordsStore = defineStore('words', () => {
         }
     }
 
-    function importText(text, sourceLabel) {
-        return importItems(parseCSVContent(text), sourceLabel);
-    }
-
     // Додає нове слово або оновлює існуюче (form.id). Повертає true, якщо збережено.
     async function saveWord(form) {
-        const word = form.word.trim();
-        const translation = form.translation.trim();
-        const transcription = normalizeTranscription(form.transcription);
-        if (!word || !translation) return false;
-        const invalid = validateWord(word, translation, transcription);
-        if (invalid) {
-            ui.statusMessage = invalid;
+        const prepared = prepareFormWord(form);
+        if (prepared.skip) return false;
+        if (prepared.error) {
+            ui.statusMessage = prepared.error;
             return false;
         }
+        const { word, transcription, translation } = prepared;
 
         try {
             if (form.id) {
                 const updated = check(await sb.from('words')
-                    .update({ word, transcription: transcription || null, translation })
+                    .update({ word, transcription, translation })
                     .eq('id', form.id)
                     .select(WORD_COLUMNS)
                     .single());
                 const idx = words.value.findIndex(w => w.id === updated.id);
                 if (idx !== -1) words.value[idx] = updated;
             } else {
-                if (words.value.some(w => w.word.toLowerCase() === word.toLowerCase())) {
+                if (hasWord(words.value, word)) {
                     ui.statusMessage = `Слово «${word}» вже є у вашій колекції.`;
                     return false;
                 }
                 const newWord = check(await sb.from('words')
-                    .insert({ word, transcription: transcription || null, translation })
+                    .insert({ word, transcription, translation })
                     .select(WORD_COLUMNS)
                     .single());
                 addToCollection(newWord);

@@ -1,5 +1,5 @@
 <script setup>
-import { inject } from 'vue';
+import { computed, inject } from 'vue';
 import { useAuthStore } from '../stores/auth.js';
 import { useUiStore } from '../stores/ui.js';
 import { useWordsStore } from '../stores/words.js';
@@ -9,11 +9,13 @@ const ui = useUiStore();
 const wordsStore = useWordsStore();
 const openFilePicker = inject('openFilePicker');
 
-const tabs = [
+const tabs = computed(() => [
     { id: 'practice', icon: 'fa-cards-blank', label: 'Тренування' },
     { id: 'dictionary', icon: 'fa-book', label: 'Словник', showCount: true },
-    { id: 'stats', icon: 'fa-chart-line', label: 'SRS Прогрес' }
-];
+    { id: 'stats', icon: 'fa-chart-line', label: 'SRS Прогрес' },
+    // Адмінка: список користувачів і словники студентів
+    ...(auth.canManageUsers ? [{ id: 'users', icon: 'fa-users', label: auth.isAdmin ? 'Користувачі' : 'Студенти' }] : [])
+]);
 </script>
 
 <template>
@@ -67,6 +69,8 @@ const tabs = [
                     <span class="text-xs font-semibold text-slate-200 max-w-[90px] truncate">{{ auth.user.username }}</span>
                     <span v-if="auth.isAdmin" title="Супер-адмін: може видаляти слова в загальному словнику"
                           class="text-[9px] font-bold uppercase text-amber-300 bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 rounded-md">Адмін</span>
+                    <span v-else-if="auth.isTeacher" title="Викладач: редагує словники своїх студентів"
+                          class="text-[9px] font-bold uppercase text-violet-300 bg-violet-500/15 border border-violet-500/30 px-1.5 py-0.5 rounded-md">Викладач</span>
                     <button @click="auth.logout()" title="Вийти"
                             class="text-slate-400 hover:text-rose-400 text-xs px-1.5 py-0.5 rounded-lg hover:bg-slate-700 transition-all">
                         <i class="fa-solid fa-right-from-bracket"></i>

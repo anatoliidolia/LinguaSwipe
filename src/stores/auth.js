@@ -5,6 +5,7 @@ import { readStored, writeStored, STORAGE_KEYS } from '../lib/storage.js';
 import { useUiStore } from './ui.js';
 import { useWordsStore } from './words.js';
 import { usePracticeStore } from './practice.js';
+import { useStudentsStore } from './students.js';
 
 const GUEST = { guest: true, username: 'Гість' };
 
@@ -18,23 +19,34 @@ export const useAuthStore = defineStore('auth', () => {
     const authMode = ref('login');
     const authError = ref('');
     const authLoading = ref(false);
-    // Супер-адмін (таблиця admins, migrations/002_super_admin.sql) може видаляти слова із загального словника
-    const isAdmin = ref(false);
+    // Роль (migrations/003_teachers.sql): 'admin' — може все (002_super_admin.sql),
+    // 'teacher' — редагує словники своїх студентів, 'student' — лише свій словник.
+    // Інтерфейс лише ховає кнопки: права перевіряє база.
+    const role = ref('student');
 
     const isGuest = computed(() => !!(user.value && user.value.guest));
+    const isAdmin = computed(() => role.value === 'admin');
+    const isTeacher = computed(() => role.value === 'teacher');
+    const canManageUsers = computed(() => !isGuest.value && (isAdmin.value || isTeacher.value));
 
-    async function loadAdminFlag() {
-        if (isGuest.value) { isAdmin.value = false; return; }
-        const { data, error } = await sb.rpc('is_admin');
-        // Міграцію ще не виконано або немає мережі — просто без прав адміна
-        isAdmin.value = !error && data === true;
+    async function loadRole() {
+        if (isGuest.value) { role.value = 'student'; return; }
+        const { data, error } = await sb.rpc('my_role');
+        if (!error && ['admin', 'teacher', 'student'].includes(data)) {
+            role.value = data;
+            return;
+        }
+        // Міграцію 003 ще не виконано — роль адміна з 002; немає мережі — просто без прав
+        const admin = await sb.rpc('is_admin');
+        role.value = !admin.error && admin.data === true ? 'admin' : 'student';
     }
 
     function resetUserState() {
         user.value = null;
-        isAdmin.value = false;
+        role.value = 'student';
         useWordsStore().reset();
         usePracticeStore().reset();
+        useStudentsStore().reset();
         useUiStore().reset();
     }
 
@@ -131,9 +143,12 @@ export const useAuthStore = defineStore('auth', () => {
         authMode,
         authError,
         authLoading,
+        role,
         isAdmin,
+        isTeacher,
+        canManageUsers,
         isGuest,
-        loadAdminFlag,
+        loadRole,
         setMode,
         submit,
         loginAsGuest,

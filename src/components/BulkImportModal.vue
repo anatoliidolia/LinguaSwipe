@@ -1,15 +1,21 @@
 <script setup>
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { useUiStore } from '../stores/ui.js';
 import { useWordsStore } from '../stores/words.js';
+import { useStudentsStore } from '../stores/students.js';
 
 const ui = useUiStore();
 const wordsStore = useWordsStore();
+const studentsStore = useStudentsStore();
 const bulkText = ref('');
+
+// Свій словник або словник студента: обидва стори мають однаковий importText(text, label)
+const forStudent = computed(() => ui.modalTarget === 'student' && studentsStore.student);
+const target = computed(() => forStudent.value ? studentsStore : wordsStore);
 
 async function processBulkImport() {
     if (!bulkText.value.trim()) return;
-    if (await wordsStore.importText(bulkText.value, 'Текст')) ui.bulkModalOpen = false;
+    if (await target.value.importText(bulkText.value, 'Текст')) ui.bulkModalOpen = false;
 }
 </script>
 
@@ -28,11 +34,14 @@ async function processBulkImport() {
                 <i class="fa-solid fa-file-import text-sky-400"></i>
                 Масове завантаження слів з тексту
             </h3>
+            <p v-if="forStudent" class="text-xs text-amber-300 mb-2">
+                <i class="fa-solid fa-user-graduate mr-1"></i>Словник студента: {{ studentsStore.student.email }}
+            </p>
 
             <p class="text-xs text-slate-400 mb-4">
                 Вставте список слів у форматі: <code class="text-sky-300 font-mono">Слово, Переклад</code> або <code class="text-sky-300 font-mono">Слово - Переклад</code>.
                 Транскрипцію можна додати другою колонкою в квадратних дужках: <code class="text-sky-300 font-mono">Слово, [транскрипція], Переклад</code>.
-                Слова, які вже є у вашій колекції, буде пропущено.
+                Слова, які вже є у {{ forStudent ? 'словнику студента' : 'вашій колекції' }}, буде пропущено.
             </p>
 
             <textarea
