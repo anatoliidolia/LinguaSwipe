@@ -6,6 +6,11 @@ import { LEITNER_BOXES } from '../lib/srs.js';
 const wordsStore = useWordsStore();
 
 const boxCounts = computed(() => LEITNER_BOXES.map((_, box) => wordsStore.words.filter(w => w.box === box).length));
+const forecastItems = computed(() => [
+    { label: 'Повторити сьогодні', value: wordsStore.forecast.today, color: 'text-sky-400' },
+    { label: 'Завтра', value: wordsStore.forecast.tomorrow, color: 'text-amber-400' },
+    { label: 'За 7 днів', value: wordsStore.forecast.week, color: 'text-emerald-400' }
+]);
 const boxPercent = box => wordsStore.words.length ? (boxCounts.value[box] / wordsStore.words.length * 100) + '%' : '0%';
 </script>
 
@@ -19,8 +24,16 @@ const boxPercent = box => wordsStore.words.length ? (boxCounts.value[box] / word
                 Матриця повторень Leitner (SRS)
             </h2>
             <p class="text-xs text-slate-400 leading-relaxed">
-                Кожне успішне «Знаю» переміщує слово у вищий Box і збільшує інтервал повторення. Якщо слово свайпнути «Не знаю» — воно повертається в Box 0 і повторюється в цій же сесії.
+                Кожне успішне «Знаю» переміщує слово у вищий Box і відкладає його на довший інтервал: слово зникає з тренувань і повертається, коли настане час повторення. Якщо слово свайпнути «Не знаю» — воно повертається в Box 0 і повторюється в цій же сесії.
             </p>
+        </div>
+
+        <!-- Прогноз повторень -->
+        <div v-if="wordsStore.hasSchedule" class="grid grid-cols-3 gap-3 mb-6">
+            <div v-for="item in forecastItems" :key="item.label" class="glass-card p-4 rounded-2xl border border-slate-800 text-center">
+                <span class="text-2xl font-black block" :class="item.color">{{ item.value }}</span>
+                <span class="text-[11px] text-slate-400">{{ item.label }}</span>
+            </div>
         </div>
 
         <!-- 6 Boxes Grid -->

@@ -29,9 +29,15 @@ export function translateError(message) {
 }
 
 export function check({ data, error }) {
-    if (error) throw new Error(translateError(error.message));
+    if (error) {
+        const err = new Error(translateError(error.message));
+        err.code = error.code; // код Postgres, напр. 42703 — колонки ще немає (міграцію не виконано)
+        throw err;
+    }
     return data;
 }
+
+export const isMissingColumn = err => !!err && err.code === '42703';
 
 // Supabase returns at most 1000 rows per request — fetch page by page
 export async function fetchAllRows(makeQuery) {

@@ -1,11 +1,15 @@
 <script setup>
 import { computed, ref } from 'vue';
+import { daysUntil, formatDaysFromNow, isDue } from '../lib/srs.js';
 
 // Пошук + сітка карток слів. Кнопки біля слова — слот #actions, праворуч від пошуку — слот #toolbar.
 const props = defineProps({
     words: { type: Array, required: true },
     emptyText: { type: String, default: 'Слів не знайдено за вашим запитом.' }
 });
+
+// «повтор завтра» — лише для слів із розкладом (словник студента його не має)
+const reviewLabel = item => item.due_at && !isDue(item) ? 'повтор ' + formatDaysFromNow(daysUntil(item.due_at)) : '';
 
 const searchQuery = ref('');
 const filteredWords = computed(() => {
@@ -42,6 +46,7 @@ const filteredWords = computed(() => {
                         <span v-if="item.transcription" class="font-normal text-sm text-slate-400 ml-1">[{{ item.transcription }}]</span>
                     </h3>
                     <p class="text-emerald-400 font-semibold text-sm">{{ item.translation }}</p>
+                    <p v-if="reviewLabel(item)" class="text-[10px] text-slate-500 mt-1"><i class="fa-solid fa-clock mr-1"></i>{{ reviewLabel(item) }}</p>
                 </div>
 
                 <div class="flex items-center gap-2.5">

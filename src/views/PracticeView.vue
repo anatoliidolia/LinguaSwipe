@@ -1,5 +1,6 @@
 <script setup>
-import { inject, onMounted, onUnmounted } from 'vue';
+import { computed, inject, onMounted, onUnmounted } from 'vue';
+import { formatDaysFromNow, pluralWords } from '../lib/srs.js';
 import { usePracticeStore } from '../stores/practice.js';
 import { useUiStore } from '../stores/ui.js';
 import { useWordsStore } from '../stores/words.js';
@@ -9,6 +10,13 @@ const practice = usePracticeStore();
 const ui = useUiStore();
 const wordsStore = useWordsStore();
 const openFilePicker = inject('openFilePicker');
+
+// «Наступне повторення: завтра · 5 слів»
+const nextReviewText = computed(() => {
+    const next = wordsStore.nextReview;
+    if (!next) return '';
+    return `${formatDaysFromNow(next.days)} · ${pluralWords(next.count)}`;
+});
 
 // Гарячі клавіші працюють, лише поки відкрита вкладка тренування і немає модальних вікон
 function handleKeydown(e) {
@@ -39,6 +47,8 @@ onUnmounted(() => window.removeEventListener('keydown', handleKeydown));
             <div class="flex items-center gap-2 font-medium">
                 <span class="w-2.5 h-2.5 rounded-full bg-sky-400 animate-pulse"></span>
                 <span>Залишилось у сесії: <strong class="text-white font-bold">{{ practice.activeQueue.length }}</strong></span>
+                <span v-if="practice.reviewAhead" class="text-[10px] font-bold uppercase text-amber-300 bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 rounded-md"
+                      title="Слова, яким ще не час: «Знаю» не змінює розклад">Наперед</span>
             </div>
             <div class="flex items-center gap-3">
                 <span class="text-emerald-400 font-semibold"><i class="fa-solid fa-circle-check mr-1"></i>{{ practice.sessionKnowCount }}</span>
@@ -89,15 +99,25 @@ onUnmounted(() => window.removeEventListener('keydown', handleKeydown));
             </div>
         </div>
 
-        <!-- SESSION COMPLETED STATE -->
+        <!-- SESSION COMPLETED / NOTHING DUE STATE -->
         <div v-else class="w-full glass-card rounded-3xl p-8 text-center shadow-2xl border border-slate-700/60 my-auto flex flex-col items-center">
             <div class="w-20 h-20 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-4xl mb-4 border border-emerald-500/40 shadow-lg shadow-emerald-500/20 animate-bounce">
-                <i class="fa-solid fa-trophy"></i>
+                <i class="fa-solid" :class="practice.initialSessionCount > 0 ? 'fa-trophy' : 'fa-mug-hot'"></i>
             </div>
-            <h2 class="text-3xl font-extrabold text-white mb-2">Сесію завершено!</h2>
-            <p class="text-slate-400 text-sm max-w-xs mb-6">Усі слова з цієї сесії пройдені та зафіксовані в інтервальній системі повторень SRS!</p>
+            <template v-if="practice.initialSessionCount > 0">
+                <h2 class="text-3xl font-extrabold text-white mb-2">Сесію завершено!</h2>
+                <p class="text-slate-400 text-sm max-w-xs mb-4">Кожне слово повернеться саме тоді, коли його час повторити: чим краще ви його знаєте, тим рідше.</p>
+            </template>
+            <template v-else>
+                <h2 class="text-2xl font-extrabold text-white mb-2">На сьогодні все повторено</h2>
+                <p class="text-slate-400 text-sm max-w-xs mb-4">Слова з'являться знову, коли настане їхній час. Можна додати нові слова або повторити наперед.</p>
+            </template>
 
-            <div class="grid grid-cols-2 gap-3 w-full mb-6">
+            <p v-if="nextReviewText" class="text-sm text-sky-300 bg-sky-500/10 border border-sky-500/20 rounded-xl px-4 py-2 mb-6">
+                <i class="fa-solid fa-calendar-day mr-1.5"></i>Наступне повторення: <strong>{{ nextReviewText }}</strong>
+            </p>
+
+            <div v-if="practice.initialSessionCount > 0" class="grid grid-cols-2 gap-3 w-full mb-6">
                 <div class="bg-slate-800/60 p-3 rounded-2xl border border-slate-700/50">
                     <span class="text-xs text-slate-400 block mb-1">Вивчено в сесії</span>
                     <span class="text-2xl font-black text-emerald-400">{{ practice.sessionKnowCount }}</span>
@@ -109,15 +129,24 @@ onUnmounted(() => window.removeEventListener('keydown', handleKeydown));
             </div>
 
             <button
+                    v-if="wordsStore.dueCount > 0"
                     @click="practice.startSession()"
                     class="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-bold text-sm shadow-xl shadow-sky-500/25 transition-all flex items-center justify-center gap-2">
                 <i class="fa-solid fa-rotate-right"></i>
-                <span>Почати нову сесію</span>
+                <span>{{ wordsStore.hasSchedule ? `Повторити ще ${wordsStore.dueCount}` : 'Почати нову сесію' }}</span>
+            </button>
+            <button
+                    v-else
+                    @click="practice.startSession({ ahead: true })"
+                    title="«Знаю» не змінює розклад, «Не знаю» повертає слово на рівень 0"
+                    class="w-full py-3 px-6 rounded-2xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-semibold text-sm transition-all flex items-center justify-center gap-2">
+                <i class="fa-solid fa-forward"></i>
+                <span>Повторити наперед ({{ wordsStore.words.length }})</span>
             </button>
         </div>
 
         <!-- ACTION BUTTONS BAR -->
-        <div v-if="practice.activeQueue.length > 0" class="w-full mt-4 flex items-center justify-center gap-6">
+        <div v-if="practice.activeQueue.length > 0" class="w-full mt-4 mb-4 flex items-center justify-center gap-6">
             <button
                     @click="practice.swipe('left')"
                     class="w-16 h-16 rounded-full bg-slate-900 border-2 border-rose-500/60 text-rose-400 hover:bg-rose-500 hover:text-white transition-all shadow-lg shadow-rose-500/10 flex flex-col items-center justify-center active:scale-90"
@@ -136,10 +165,11 @@ onUnmounted(() => window.removeEventListener('keydown', handleKeydown));
 
             <button
                     @click="practice.swipe('right')"
-                    class="w-16 h-16 rounded-full bg-slate-900 border-2 border-emerald-500/60 text-emerald-400 hover:bg-emerald-500 hover:text-white transition-all shadow-lg shadow-emerald-500/10 flex flex-col items-center justify-center active:scale-90"
+                    class="relative w-16 h-16 rounded-full bg-slate-900 border-2 border-emerald-500/60 text-emerald-400 hover:bg-emerald-500 hover:text-white transition-all shadow-lg shadow-emerald-500/10 flex flex-col items-center justify-center active:scale-90"
                     title="Знаю [→ / D]">
                 <i class="fa-solid fa-check text-2xl"></i>
                 <span class="text-[9px] font-bold mt-0.5 uppercase">Знаю</span>
+                <span v-if="practice.knowHint" class="absolute -bottom-5 text-[10px] font-semibold text-emerald-300/80 whitespace-nowrap">{{ practice.knowHint }}</span>
             </button>
         </div>
 

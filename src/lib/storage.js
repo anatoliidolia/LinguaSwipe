@@ -4,7 +4,9 @@ export const STORAGE_KEYS = {
     wordSource: 'linguaswipe_word_source',
     installDismissed: 'linguaswipe_install_dismissed',
     guest: 'linguaswipe_guest',
-    guestProgress: 'linguaswipe_guest_progress'
+    guestProgress: 'linguaswipe_guest_progress',
+    // Окремий ключ: старі версії сайту читають guestProgress як { слово: box } і мають і далі його розуміти
+    guestSchedule: 'linguaswipe_guest_schedule'
 };
 
 export function readStored(key) {
@@ -24,4 +26,13 @@ export function readGuestProgress() {
 
 export function writeGuestProgress(progress) {
     writeStored(STORAGE_KEYS.guestProgress, JSON.stringify(progress));
+}
+
+// { слово: due_at (ISO) } — розклад повторень гостя
+export function readGuestSchedule() {
+    try { return JSON.parse(readStored(STORAGE_KEYS.guestSchedule) || '{}'); } catch (e) { return {}; }
+}
+
+export function writeGuestSchedule(schedule) {
+    writeStored(STORAGE_KEYS.guestSchedule, JSON.stringify(schedule));
 }

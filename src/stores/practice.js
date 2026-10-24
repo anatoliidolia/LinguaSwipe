@@ -1,10 +1,12 @@
 import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
 import confetti from 'canvas-confetti';
-import { MAX_BOX } from '../lib/srs.js';
+import { isDue, knowStep, dueInDays, pluralDays } from '../lib/srs.js';
 import { useWordsStore } from './words.js';
 
-// Сесія тренування: черга карток, перевертання і рахунок «знаю / не знаю»
+// Сесія тренування: черга карток, перевертання і рахунок «знаю / не знаю».
+// У сесію потрапляють лише слова, яким настав час повторення (lib/srs.js → isDue).
+// «Знаю» піднімає рівень і відкладає слово на інтервал рівня, «Не знаю» — на рівень 0 і ще раз у цій сесії.
 export const usePracticeStore = defineStore('practice', () => {
     const wordsStore = useWordsStore();
 
@@ -13,6 +15,8 @@ export const usePracticeStore = defineStore('practice', () => {
     const isFlipped = ref(false);
     const sessionKnowCount = ref(0);
     const sessionRepeatCount = ref(0);
+    // «Повторити наперед»: тренування слів, яким ще не час. «Знаю» тут не зсуває розклад
+    const reviewAhead = ref(false);
 
     const findWord = id => wordsStore.words.find(w => w.id === id) || null;
 
@@ -26,13 +30,21 @@ export const usePracticeStore = defineStore('practice', () => {
         return Math.max(0, Math.min(100, Math.round((done / initialSessionCount.value) * 100)));
     });
 
-    function startSession() {
+    // Підказка під кнопкою «Знаю»: коли слово повернеться
+    const knowHint = computed(() => {
+        if (!currentCard.value || !wordsStore.hasSchedule) return '';
+        if (reviewAhead.value) return 'без змін';
+        return '+' + pluralDays(knowStep(currentCard.value.box).days);
+    });
+
+    function startSession({ ahead = false } = {}) {
         isFlipped.value = false;
         sessionKnowCount.value = 0;
         sessionRepeatCount.value = 0;
+        reviewAhead.value = ahead;
 
-        const dueIds = wordsStore.words.map(w => w.id);
-        activeQueue.value = dueIds.sort(() => Math.random() - 0.5);
+        const ids = wordsStore.words.filter(w => ahead || isDue(w)).map(w => w.id);
+        activeQueue.value = ids.sort(() => Math.random() - 0.5);
         initialSessionCount.value = activeQueue.value.length;
     }
 
@@ -44,9 +56,17 @@ export const usePracticeStore = defineStore('practice', () => {
         if (!currentCard.value) return;
         const card = currentCard.value;
 
+        let changed = true;
         if (direction === 'right') {
-            // KNOW -> Advance Box Level & Remove from current session
-            card.box = Math.min(MAX_BOX, card.box + 1);
+            // KNOW -> Advance Box Level, schedule next review & Remove from current session
+            if (reviewAhead.value && !isDue(card)) {
+                changed = false; // слову ще не час — розклад лишається як був
+            } else {
+                const step = knowStep(card.box);
+                card.box = step.box;
+                // Без колонки due_at (міграцію 004 не виконано) дату не зберегти — не обіцяємо її і в інтерфейсі
+                if (wordsStore.hasSchedule) card.due_at = dueInDays(step.days);
+            }
             sessionKnowCount.value++;
             activeQueue.value.shift();
 
@@ -54,8 +74,9 @@ export const usePracticeStore = defineStore('practice', () => {
                 confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });
             }
         } else {
-            // DON'T KNOW -> Reset Box to 0 & Loop back into current session
+            // DON'T KNOW -> Reset Box to 0 (due again right away) & Loop back into current session
             card.box = 0;
+            card.due_at = null;
             sessionRepeatCount.value++;
 
             const currentId = activeQueue.value.shift();
@@ -64,7 +85,7 @@ export const usePracticeStore = defineStore('practice', () => {
             activeQueue.value.splice(insertIndex, 0, currentId);
         }
 
-        wordsStore.persistWord(card);
+        if (changed) wordsStore.persistWord(card);
         isFlipped.value = false;
     }
 
@@ -86,6 +107,9 @@ export const usePracticeStore = defineStore('practice', () => {
     return {
         activeQueue,
         isFlipped,
+        reviewAhead,
+        initialSessionCount,
+        knowHint,
         sessionKnowCount,
         sessionRepeatCount,
         currentCard,
