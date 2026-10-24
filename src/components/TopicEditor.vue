@@ -5,6 +5,7 @@ import { useUiStore } from '../stores/ui.js';
 import { useTopicsStore } from '../stores/topics.js';
 import { pluralWords } from '../lib/srs.js';
 import WordList from './WordList.vue';
+import TopicProgress from './TopicProgress.vue';
 
 const auth = useAuthStore();
 const ui = useUiStore();
@@ -12,6 +13,8 @@ const topicsStore = useTopicsStore();
 const openFilePicker = inject('openFilePicker');
 
 const editable = computed(() => topicsStore.canEdit(topicsStore.topic));
+// Що показуємо під назвою: слова топіку або прогрес студентів (лише для того, хто редагує топік)
+const view = ref('words');
 // Адмін може відкрити чужий топік: тоді «студенти автора», а не «мої»
 const studentsLabel = computed(() => topicsStore.topic.owner_id === auth.user.id ? 'моїх студентів' : 'студентів автора');
 
@@ -100,6 +103,22 @@ const formatDate = value => new Date(value).toLocaleDateString('uk-UA');
             <p v-if="!editable" class="text-[11px] text-slate-500"><i class="fa-solid fa-eye mr-1"></i>Чужий топік — лише перегляд.</p>
         </div>
 
+        <div v-if="editable" class="flex self-center bg-slate-800/60 p-1 rounded-xl border border-slate-700/50 text-xs">
+            <button @click="view = 'words'"
+                    :class="view === 'words' ? 'bg-violet-500 text-white shadow-md' : 'text-slate-400 hover:text-white'"
+                    class="px-3 py-1 rounded-lg font-semibold transition-all flex items-center gap-1.5">
+                <i class="fa-solid fa-book"></i>Слова і студенти
+            </button>
+            <button @click="view = 'progress'"
+                    :class="view === 'progress' ? 'bg-violet-500 text-white shadow-md' : 'text-slate-400 hover:text-white'"
+                    class="px-3 py-1 rounded-lg font-semibold transition-all flex items-center gap-1.5">
+                <i class="fa-solid fa-chart-line"></i>Прогрес студентів
+            </button>
+        </div>
+
+        <TopicProgress v-if="editable && view === 'progress'" :topic-id="topicsStore.topic.id" :topic-title="topicsStore.topic.title" />
+
+        <template v-else>
         <!-- Студенти -->
         <div v-if="editable" class="glass-card p-4 rounded-2xl border border-slate-800 flex flex-col gap-3">
             <div class="flex items-center justify-between gap-2">
@@ -172,5 +191,6 @@ const formatDate = value => new Date(value).toLocaleDateString('uk-UA');
                 </template>
             </template>
         </WordList>
+        </template>
     </div>
 </template>

@@ -37,6 +37,9 @@ export const useWordsStore = defineStore('words', () => {
     // без reverse_* немає режиму UA → EN.
     const hasSchedule = ref(true);
     const hasReverse = ref(true);
+    // Лічильники reviews / lapses у topic_progress (migrations/007_topic_progress_reports.sql) —
+    // для звітів викладача. Без міграції topic_words їх не повертає, і ми їх не пишемо.
+    const hasTopicStats = ref(true);
 
     // Запит із новими колонками, а якщо якоїсь міграції ще немає — з тими колонками, що є.
     // levels: від найповнішого набору до базового; makeQuery(level) будує запит для рівня.
@@ -103,6 +106,7 @@ export const useWordsStore = defineStore('words', () => {
         const rows = await fetchAllRows(() => sb.rpc('topic_words', { p_topic: topicId }));
         hasSchedule.value = true;
         hasReverse.value = true;
+        hasTopicStats.value = rows.length === 0 || 'lapses' in rows[0];
         return rows.map(w => ({ ...w, topic: true }));
     }
 
@@ -170,8 +174,13 @@ export const useWordsStore = defineStore('words', () => {
 
     // Поля прогресу напрямку для запису в базу (лише ті колонки, що вже є)
     function progressFields(card, dir) {
-        if (dir === 'reverse') return { reverse_box: card.reverse_box || 0, reverse_due_at: card.reverse_due_at || null };
-        return hasSchedule.value ? { box: card.box, due_at: card.due_at || null } : { box: card.box };
+        const fields = dir === 'reverse'
+            ? { reverse_box: card.reverse_box || 0, reverse_due_at: card.reverse_due_at || null }
+            : hasSchedule.value ? { box: card.box, due_at: card.due_at || null } : { box: card.box };
+        if (card.topic && hasTopicStats.value) {
+            Object.assign(fields, { reviews: card.reviews || 0, lapses: card.lapses || 0, last_reviewed_at: card.last_reviewed_at || null });
+        }
+        return fields;
     }
 
     function persistGuest(card, dir) {

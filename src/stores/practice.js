@@ -101,6 +101,13 @@ export const usePracticeStore = defineStore('practice', () => {
         const dir = currentDir.value;
 
         let changed = true;
+        // Слова топіку: лічильники для звітів викладача (скільки разів тренували і скільки разів «Не знаю»)
+        const countReview = () => {
+            if (!card.topic) return;
+            card.reviews = (card.reviews || 0) + 1;
+            if (direction !== 'right') card.lapses = (card.lapses || 0) + 1;
+            card.last_reviewed_at = new Date().toISOString();
+        };
         if (direction === 'right') {
             // KNOW -> Advance Box Level, schedule next review & Remove from current session
             if (reviewAhead.value && !isDue(card, dir)) {
@@ -110,6 +117,7 @@ export const usePracticeStore = defineStore('practice', () => {
                 // Без колонки due_at (міграцію 004 не виконано) дату не зберегти — не обіцяємо її і в інтерфейсі
                 const dueAt = wordsStore.hasSchedule ? dueInDays(step.days) : progressOf(card, dir).due_at;
                 setProgress(card, dir, step.box, dueAt);
+                countReview();
             }
             sessionKnowCount.value++;
             activeQueue.value.shift();
@@ -120,6 +128,7 @@ export const usePracticeStore = defineStore('practice', () => {
         } else {
             // DON'T KNOW -> Reset Box to 0 (due again right away) & Loop back into current session
             setProgress(card, dir, 0, null);
+            countReview();
             sessionRepeatCount.value++;
 
             const current = activeQueue.value.shift();
