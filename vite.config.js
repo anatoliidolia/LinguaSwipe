@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
@@ -18,8 +18,10 @@ function serviceWorkerManifest() {
         generateBundle(_, bundle) {
             files = Object.keys(bundle).filter(name => !name.endsWith('.map'));
         },
-        closeBundle() {
+        // closeBundle викликається і тоді, коли збірка впала: не підміняти справжню помилку своєю
+        closeBundle(error) {
             const swPath = resolve(outDir, 'sw.js');
+            if (error || !existsSync(swPath)) return;
             const version = createHash('sha256').update(files.sort().join('\n')).digest('hex').slice(0, 10);
             const code = readFileSync(swPath, 'utf8')
                 .replace("'__BUILD_VERSION__'", JSON.stringify(version))
