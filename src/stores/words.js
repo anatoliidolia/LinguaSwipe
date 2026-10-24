@@ -16,11 +16,21 @@ export const useWordsStore = defineStore('words', () => {
     const ui = useUiStore();
 
     const words = ref([]);
-    // Word source: 'mine' = own collection (editable), 'all' = shared dictionary (read-only)
-    const wordSource = ref(readStored(STORAGE_KEYS.wordSource) === 'all' ? 'all' : 'mine');
+    // Word source: 'mine' = own collection (editable), 'all' = shared dictionary (read-only),
+    // 'my_topics' / 'public_topics' — топіки від викладача (migrations/006_topics.sql): спершу список,
+    // потім слова вибраного топіку (selectedTopic). Топіки — лише для зареєстрованих, не для гостей.
+    const SOURCES = ['mine', 'my_topics', 'public_topics', 'all'];
+    const storedSource = readStored(STORAGE_KEYS.wordSource);
+    const wordSource = ref(SOURCES.includes(storedSource) ? storedSource : 'mine');
 
-    const readOnly = computed(() => auth.isGuest || wordSource.value === 'all');
+    const isTopicSource = computed(() => !auth.isGuest && (wordSource.value === 'my_topics' || wordSource.value === 'public_topics'));
+    const readOnly = computed(() => auth.isGuest || wordSource.value !== 'mine');
     const canModerate = computed(() => auth.isAdmin && !auth.isGuest && wordSource.value === 'all');
+
+    // Топіки студента: список для вибору і відкритий топік
+    const topicList = ref([]);
+    const topicListLoading = ref(false);
+    const selectedTopic = ref(null);
 
     // Колонку due_at додає migrations/004_review_schedule.sql, reverse_* — 005_reverse_direction.sql.
     // Поки міграції немає, працюємо без відповідної функції: без розкладу слова показуються щоразу всі,
@@ -88,27 +98,74 @@ export const useWordsStore = defineStore('words', () => {
             .order('id', { ascending: false }));
     }
 
+    // Слова топіку разом із прогресом поточного користувача (у топіків є всі колонки розкладу)
+    async function loadTopicWords(topicId) {
+        const rows = await fetchAllRows(() => sb.rpc('topic_words', { p_topic: topicId }));
+        hasSchedule.value = true;
+        hasReverse.value = true;
+        return rows.map(w => ({ ...w, topic: true }));
+    }
+
+    async function loadTopicList() {
+        topicListLoading.value = true;
+        try {
+            const scope = wordSource.value === 'my_topics' ? 'assigned' : 'public';
+            return check(await sb.rpc('list_topics', { p_scope: scope }));
+        } finally {
+            topicListLoading.value = false;
+        }
+    }
+
     let loadCounter = 0;
     async function loadWords() {
         const loadId = ++loadCounter;
         auth.loadRole();
         let loaded = [];
+        let topics = null;
         try {
-            loaded = readOnly.value ? await loadSharedWords() : await loadOwnWords();
+            if (isTopicSource.value && selectedTopic.value) loaded = await loadTopicWords(selectedTopic.value.id);
+            else if (isTopicSource.value) topics = await loadTopicList();
+            else loaded = readOnly.value ? await loadSharedWords() : await loadOwnWords();
         } catch (err) {
             ui.statusMessage = err.message;
         }
         if (loadId !== loadCounter) return; // a newer load (e.g. source switch) has started
+        if (topics) topicList.value = topics;
         words.value = loaded;
         usePracticeStore().startSession();
     }
 
     function setWordSource(source) {
-        if (wordSource.value === source) return;
+        if (wordSource.value === source || !SOURCES.includes(source)) return;
         wordSource.value = source;
         writeStored(STORAGE_KEYS.wordSource, source);
+        selectedTopic.value = null;
+        topicList.value = [];
         ui.statusMessage = '';
         loadWords();
+    }
+
+    function openTopic(topic) {
+        selectedTopic.value = { id: topic.id, title: topic.title, owner_name: topic.owner_name };
+        ui.statusMessage = '';
+        loadWords();
+    }
+
+    function closeTopic() {
+        selectedTopic.value = null;
+        loadWords();
+    }
+
+    // «★ У мій словник»: копія слова топіку у власну колекцію (розклад починається з нуля)
+    async function copyToMine(item) {
+        try {
+            check(await sb.from('words').insert({
+                word: item.word, transcription: item.transcription || null, translation: item.translation
+            }));
+            ui.statusMessage = `Слово «${item.word}» додано у ваш словник.`;
+        } catch (err) {
+            ui.statusMessage = err.message;
+        }
     }
 
     // Поля прогресу напрямку для запису в базу (лише ті колонки, що вже є)
@@ -136,7 +193,12 @@ export const useWordsStore = defineStore('words', () => {
     // Зберігає рівень і дату наступного повторення для напрямку dir ('forward' | 'reverse')
     async function persistWord(card, dir = 'forward') {
         try {
-            if (auth.isGuest) {
+            if (card.topic) {
+                // Прогрес по слову топіку — свій рядок у topic_progress; інший напрямок не зачіпається
+                check(await sb.from('topic_progress').upsert(
+                    { user_id: auth.user.id, topic_word_id: card.id, ...progressFields(card, dir), updated_at: new Date().toISOString() },
+                    { onConflict: 'user_id,topic_word_id' }));
+            } else if (auth.isGuest) {
                 persistGuest(card, dir);
             } else if (card.key) {
                 // Upsert оновлює лише передані колонки: прогрес іншого напрямку не зачіпається
@@ -242,6 +304,8 @@ export const useWordsStore = defineStore('words', () => {
 
     function reset() {
         words.value = [];
+        topicList.value = [];
+        selectedTopic.value = null;
     }
 
     return {
@@ -249,6 +313,13 @@ export const useWordsStore = defineStore('words', () => {
         wordSource,
         readOnly,
         canModerate,
+        isTopicSource,
+        topicList,
+        topicListLoading,
+        selectedTopic,
+        openTopic,
+        closeTopic,
+        copyToMine,
         hasSchedule,
         hasReverse,
         loadWords,

@@ -5,7 +5,9 @@ import { daysUntil, formatDaysFromNow, isDue } from '../lib/srs.js';
 // Пошук + сітка карток слів. Кнопки біля слова — слот #actions, праворуч від пошуку — слот #toolbar.
 const props = defineProps({
     words: { type: Array, required: true },
-    emptyText: { type: String, default: 'Слів не знайдено за вашим запитом.' }
+    emptyText: { type: String, default: 'Слів не знайдено за вашим запитом.' },
+    // Рівень SRS біля слова; у редакторі топіку він не має сенсу (це прогрес викладача, а не студентів)
+    showBox: { type: Boolean, default: true }
 });
 
 // «повтор завтра» — лише для слів із розкладом (словник студента його не має)
@@ -50,7 +52,7 @@ const filteredWords = computed(() => {
                 </div>
 
                 <div class="flex items-center gap-2.5">
-                    <span class="text-[10px] font-mono font-bold px-2 py-1 rounded-md bg-slate-800 text-slate-400 border border-slate-700">
+                    <span v-if="showBox" class="text-[10px] font-mono font-bold px-2 py-1 rounded-md bg-slate-800 text-slate-400 border border-slate-700">
                         Box {{ item.box }}
                     </span>
                     <slot name="actions" :item="item"></slot>

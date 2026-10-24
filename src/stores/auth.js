@@ -6,6 +6,7 @@ import { useUiStore } from './ui.js';
 import { useWordsStore } from './words.js';
 import { usePracticeStore } from './practice.js';
 import { useStudentsStore } from './students.js';
+import { useTopicsStore } from './topics.js';
 
 const GUEST = { guest: true, username: 'Гість' };
 
@@ -47,6 +48,7 @@ export const useAuthStore = defineStore('auth', () => {
         useWordsStore().reset();
         usePracticeStore().reset();
         useStudentsStore().reset();
+        useTopicsStore().reset();
         useUiStore().reset();
     }
 

@@ -1,4 +1,5 @@
 import { normalizeTranscription, validateWord, MAX_WORD_LENGTH, MAX_TRANSLATION_LENGTH } from './validation.js';
+import { pluralWords } from './srs.js';
 
 // Спільна підготовка слів для власного словника і словника студента
 
@@ -34,7 +35,7 @@ export function prepareImport(items, existingWords) {
 }
 
 export function importSummary(sourceLabel, addedCount, skippedCount) {
-    return `${sourceLabel}: додано ${addedCount} слів` +
+    return `${sourceLabel}: додано ${pluralWords(addedCount)}` +
         (skippedCount ? `, пропущено ${skippedCount} (дублікати, порожні або з недозволеними символами)` : '');
 }
 
