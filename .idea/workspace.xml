@@ -1,0 +1,201 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ChangeListManager">
+    <list default="true" id="62467bd0-a1a2-492d-92e2-3b7671b11518" name="Changes" comment="Added superuser">
+      <change afterPath="$PROJECT_DIR$/.env.example" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/php.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/CLAUDE.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/migrations/001_transcription.sql" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/migrations/002_super_admin.sql" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/package-lock.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/postcss.config.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/App.vue" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/assets/main.css" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/components/AppHeader.vue" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/components/AuthScreen.vue" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/components/BulkImportModal.vue" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/components/InstallBanner.vue" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/components/StatusBanner.vue" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/components/SwipeCard.vue" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/components/WordFormModal.vue" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/components/WordSourceSwitch.vue" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/lib/csv.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/lib/pwa.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/lib/srs.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/lib/storage.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/lib/supabase.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/lib/validation.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/stores/auth.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/stores/practice.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/stores/ui.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/stores/words.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/views/DictionaryView.vue" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/views/PracticeView.vue" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/views/StatsView.vue" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/tailwind.config.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/vite.config.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.github/workflows/pages.yml" beforeDir="false" afterPath="$PROJECT_DIR$/.github/workflows/pages.yml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/chrome-extension/background.js" beforeDir="false" afterPath="$PROJECT_DIR$/chrome-extension/background.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/icons/apple-touch-icon.png" beforeDir="false" afterPath="$PROJECT_DIR$/public/icons/apple-touch-icon.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/icons/icon-192.png" beforeDir="false" afterPath="$PROJECT_DIR$/public/icons/icon-192.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/icons/icon-512.png" beforeDir="false" afterPath="$PROJECT_DIR$/public/icons/icon-512.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/icons/icon.svg" beforeDir="false" afterPath="$PROJECT_DIR$/public/icons/icon.svg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/index.html" beforeDir="false" afterPath="$PROJECT_DIR$/index.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/manifest.json" beforeDir="false" afterPath="$PROJECT_DIR$/public/manifest.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/sw.js" beforeDir="false" afterPath="$PROJECT_DIR$/public/sw.js" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="ComposerSettings">
+    <execution />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;anatoliidolia&quot;
+  }
+}</component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/anatoliidolia/LinguaSwipe.git&quot;,
+    &quot;accountId&quot;: &quot;8276a445-97ff-41de-a0e2-daff43ce9de7&quot;
+  }
+}</component>
+  <component name="PhpWorkspaceProjectConfiguration" interpreter_name="/opt/homebrew/Cellar/php/8.5.10/bin/php" />
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 1
+}</component>
+  <component name="ProjectId" id="3K9GAC7rvw6L1hDMNiI8ULqeHsV" />
+  <component name="ProjectLevelVcsManager">
+    <ConfirmationsSetting value="2" id="Add" />
+  </component>
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
+    "git-widget-placeholder": "refactoring",
+    "last_opened_file_path": "/Users/doliaanatolii/PhpstormProjects/LinguaSwipe",
+    "nodejs_package_manager_path": "npm",
+    "settings.editor.selected.configurable": "preferences.pluginManager",
+    "vue.rearranger.settings.migration": "true"
+  }
+}]]></component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-php-predefined-a98d8de5180a-0e0d91225499-com.jetbrains.php.sharedIndexes-PS-253.29346.257" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="62467bd0-a1a2-492d-92e2-3b7671b11518" name="Changes" comment="" />
+      <created>1790962224884</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1790962224884</updated>
+      <workItem from="1790962226041" duration="3267000" />
+      <workItem from="1792158372971" duration="545000" />
+      <workItem from="1792158949105" duration="11232000" />
+      <workItem from="1792329860472" duration="3892000" />
+      <workItem from="1792509523830" duration="6502000" />
+      <workItem from="1792854519751" duration="1238000" />
+    </task>
+    <task id="LOCAL-00001" summary="GitHub Pages Init">
+      <option name="closed" value="true" />
+      <created>1792162864606</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1792162864606</updated>
+    </task>
+    <task id="LOCAL-00002" summary="GitHub Pages Init">
+      <option name="closed" value="true" />
+      <created>1792163609752</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1792163609752</updated>
+    </task>
+    <task id="LOCAL-00003" summary="GitHub Pages Init">
+      <option name="closed" value="true" />
+      <created>1792163991469</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1792163991469</updated>
+    </task>
+    <task id="LOCAL-00004" summary="Created guest mode">
+      <option name="closed" value="true" />
+      <created>1792223749229</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1792223749229</updated>
+    </task>
+    <task id="LOCAL-00005" summary="Security updates &amp; chrome-extension">
+      <option name="closed" value="true" />
+      <created>1792330744107</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1792330744107</updated>
+    </task>
+    <task id="LOCAL-00006" summary="Security updates &amp; chrome-extension">
+      <option name="closed" value="true" />
+      <created>1792330768623</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1792330768623</updated>
+    </task>
+    <task id="LOCAL-00007" summary="Added transcription">
+      <option name="closed" value="true" />
+      <created>1792510045609</created>
+      <option name="number" value="00007" />
+      <option name="presentableId" value="LOCAL-00007" />
+      <option name="project" value="LOCAL" />
+      <updated>1792510045609</updated>
+    </task>
+    <task id="LOCAL-00008" summary="Added superuser">
+      <option name="closed" value="true" />
+      <created>1792510925260</created>
+      <option name="number" value="00008" />
+      <option name="presentableId" value="LOCAL-00008" />
+      <option name="project" value="LOCAL" />
+      <updated>1792510925260</updated>
+    </task>
+    <option name="localTasksCounter" value="9" />
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="GitHub Pages Init" />
+    <MESSAGE value="Created guest mode" />
+    <MESSAGE value="Security updates &amp; chrome-extension" />
+    <MESSAGE value="Added transcription" />
+    <MESSAGE value="Added superuser" />
+    <option name="LAST_COMMIT_MESSAGE" value="Added superuser" />
+  </component>
+</project>

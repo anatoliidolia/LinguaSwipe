@@ -85,7 +85,7 @@ on conflict do nothing;
 ## Як це влаштовано
 
 ```
-Браузер / телефон (index.html, PWA)
+Браузер / телефон (Vue-додаток, PWA)
    │  supabase-js
    ▼
 Supabase
@@ -93,7 +93,7 @@ Supabase
    └─ Postgres  → таблиця words, захищена Row Level Security
 ```
 
-- **Фронтенд** — один файл `index.html`: Vue 3, Tailwind CSS, Font Awesome (з CDN). Збірка не потрібна.
+- **Фронтенд** — Vue 3 + Pinia, збірка Vite, Tailwind CSS, Font Awesome (з CDN).
 - **Бекенд** — [Supabase](https://supabase.com) (безкоштовний тариф). Власного сервера немає.
 - **Безпека** — у сайті використовується лише публічний `anon`-ключ. Доступ до даних обмежують правила RLS у базі: кожен користувач читає і змінює тільки свої слова (`auth.uid() = user_id`).
 - **Хостинг** — GitHub Pages, публікація через GitHub Actions.
@@ -102,12 +102,18 @@ Supabase
 
 | Файл | Призначення |
 |---|---|
-| `index.html` | Увесь застосунок: інтерфейс, логіка, робота з Supabase |
-| `manifest.json`, `sw.js`, `icons/` | PWA: встановлення на телефон і офлайн-запуск |
+| `index.html`, `src/main.js`, `src/App.vue` | Точка входу і каркас додатку |
+| `src/views/` | Вкладки: тренування, словник, прогрес SRS |
+| `src/components/` | Шапка, екран входу, картка зі свайпом, модальні вікна |
+| `src/stores/` | Стан (Pinia): `auth`, `words`, `practice`, `ui` |
+| `src/lib/` | Логіка без інтерфейсу: Supabase, перевірка символів, розбір CSV, localStorage |
+| `public/` (`manifest.json`, `sw.js`, `icons/`) | PWA: встановлення на телефон і офлайн-запуск |
+| `vite.config.js` | Збірка; підставляє у `sw.js` список файлів і версію кешу |
 | `chrome-extension/` | Розширення для Chrome: додавання виділених слів (Manifest V3, без збірки) |
 | `supabase_setup.sql` | Початкова схема: таблиця `words` і правила доступу в Supabase |
 | `migrations/` | Зміни схеми після запуску — виконуються по черзі, дані не видаляють |
-| `.github/workflows/pages.yml` | Публікація на GitHub Pages з підстановкою налаштувань Supabase |
+| `.github/workflows/pages.yml` | Збірка (`npm run build`) і публікація `dist/` на GitHub Pages |
+| `CLAUDE.md` | Правила для AI-асистента: git, міграції, екранування |
 
 ## Розгортання власної копії
 
@@ -118,16 +124,16 @@ Supabase
 2. **GitHub.** Зробіть fork репозиторію і в ньому:
    - **Settings → Secrets and variables → Actions → Variables** → додайте `SUPABASE_URL` і `SUPABASE_KEY`.
    - **Settings → Pages → Source** → **GitHub Actions**.
-3. Зробіть push у `main` — workflow підставить налаштування в `index.html` і опублікує сайт.
+3. Зробіть push у `main` — workflow збере додаток з вашими налаштуваннями і опублікує сайт.
 
 ### Локальний запуск
 
-Service worker і вхід працюють лише через `http://localhost` або `https`, тож файл треба віддавати через сервер. Спершу підставте свої значення замість `__SUPABASE_URL__` і `__SUPABASE_KEY__` в `index.html` (не комітьте ці зміни), потім:
+Потрібен Node.js 20+.
 
 ```bash
-python3 -m http.server 8000
-# або
-php -S localhost:8000
+cp .env.example .env.local   # підставте Project URL і anon-ключ Supabase
+npm install
+npm run dev                  # http://localhost:5173
 ```
 
-і відкрийте http://localhost:8000.
+Перевірити продакшен-збірку (разом із service worker): `npm run build && npm run preview`.

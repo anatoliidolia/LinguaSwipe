@@ -109,7 +109,7 @@ async function logout() {
 }
 
 // ===== WORDS =====
-// Дозволені символи — ті самі правила, що й у базі (supabase_setup.sql) і на сайті (index.html)
+// Дозволені символи — ті самі правила, що й у базі (supabase_setup.sql) і на сайті (src/lib/validation.js)
 const WORD_PATTERN = /^[A-Za-z][A-Za-z0-9 '’ʼ.-]*$/;
 const TRANSLATION_PATTERN = /^[A-Za-zА-яЁёЄєІіЇїҐґ0-9«"(][A-Za-zА-яЁёЄєІіЇїҐґ0-9 ,;:.!?()'’ʼ"«»\/–—-]*$/;
 const TRANSCRIPTION_PATTERN = /^[^<>&{}`=$\\"\[\]]+$/;
