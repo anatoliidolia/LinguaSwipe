@@ -1,8 +1,9 @@
 <script setup>
-import { onMounted, onUnmounted, watch } from 'vue';
+import { onMounted, onUnmounted, ref, watch } from 'vue';
 import { useAuthStore } from '../stores/auth.js';
 import { useStudentsStore } from '../stores/students.js';
 import StudentDictionary from '../components/StudentDictionary.vue';
+import StudentProgress from '../components/StudentProgress.vue';
 
 const auth = useAuthStore();
 const studentsStore = useStudentsStore();
@@ -18,12 +19,16 @@ watch(() => studentsStore.onlyMyStudents, () => studentsStore.loadUsers());
 onMounted(() => studentsStore.loadUsers());
 onUnmounted(() => clearTimeout(searchTimer));
 
+// Прогрес студента по моїх топіках
+const progressStudent = ref(null);
+
 const formatDate = value => new Date(value).toLocaleDateString('uk-UA');
 </script>
 
 <template>
     <div class="w-full flex-1 flex flex-col my-2">
         <StudentDictionary v-if="studentsStore.student" />
+        <StudentProgress v-else-if="progressStudent" :student="progressStudent" @back="progressStudent = null" />
 
         <template v-else>
             <!-- Controls -->
@@ -90,6 +95,12 @@ const formatDate = value => new Date(value).toLocaleDateString('uk-UA');
                                 :class="user.is_my_student ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white'"
                                 class="px-2.5 py-1.5 rounded-xl text-[11px] font-semibold border transition-all flex items-center gap-1.5">
                             <i class="fa-solid fa-user-graduate"></i>{{ user.is_my_student ? 'Мій студент ✓' : 'Додати в студенти' }}
+                        </button>
+
+                        <button v-if="studentsStore.canEditDictionary(user)"
+                                @click="progressStudent = { id: user.id, email: user.email }"
+                                class="px-2.5 py-1.5 rounded-xl text-[11px] font-bold bg-slate-800 hover:bg-slate-700 border border-slate-700 text-emerald-300 transition-all flex items-center gap-1.5">
+                            <i class="fa-solid fa-chart-line"></i>Прогрес
                         </button>
 
                         <button v-if="studentsStore.canEditDictionary(user)"

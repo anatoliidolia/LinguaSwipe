@@ -114,6 +114,20 @@ export function forecast(words, directions) {
     return result;
 }
 
+// Звіти викладача (migrations/007_topic_progress_reports.sql рахує так само):
+// вивчено — рівень 3+ у напрямку EN → UA (повтор раз на тиждень і рідше); проблемне слово — 2+ «Не знаю»
+export const LEARNED_BOX = 3;
+export const PROBLEM_LAPSES = 2;
+
+// «сьогодні», «вчора», «5 днів тому»; без дати — «ще не тренувався»
+export function formatDaysAgo(date, now = new Date()) {
+    if (!date) return 'ще не тренувався';
+    const days = -daysUntil(date, now);
+    if (days <= 0) return 'сьогодні';
+    if (days === 1) return 'вчора';
+    return `${pluralDays(days)} тому`;
+}
+
 export function formatDaysFromNow(days) {
     if (days <= 0) return 'сьогодні';
     if (days === 1) return 'завтра';

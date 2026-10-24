@@ -54,6 +54,8 @@ export const useStudentsStore = defineStore('students', () => {
     }
 
     async function setStudent(user, isStudent) {
+        // Зняття — із підтвердженням: студент втратить публічні топіки викладача, а викладач — доступ до його словника
+        if (!isStudent && !confirm(`Прибрати ${user.email} зі своїх студентів? Він перестане бачити ваші публічні топіки, а ви — його словник. Особисто призначені топіки залишаться.`)) return;
         try {
             check(await sb.rpc('set_student', { p_student: user.id, p_is_student: isStudent }));
             user.is_my_student = isStudent;
